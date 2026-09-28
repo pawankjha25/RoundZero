@@ -1,0 +1,97 @@
+version: 1
+round_type: xfn
+
+scenarios:
+  - id: rushed_risky_feature
+    level: [senior, staff, principal]
+    prompt: >
+      Your PM wants to ship a new feature in two weeks for a marketing deadline, but
+      you believe the current implementation plan is technically risky and rushed.
+      Walk me through how you'd handle this.
+    seed_probes:
+      - "The PM says the marketing deadline is non-negotiable and leadership already
+        committed to it externally - how do you respond?"
+      - "What would you actually propose as an alternative, concretely?"
+      - "How do you handle it if the PM overrules you and it ships anyway?"
+
+  - id: design_vs_eng_priority
+    level: [senior, staff, principal]
+    prompt: >
+      Your design team wants a full visual redesign of a core flow, but your team
+      believes fixing underlying reliability issues in that same flow is more urgent.
+      You share a roadmap and limited capacity. Walk me through how you'd resolve this.
+    seed_probes:
+      - "The design lead says users are already complaining about the current look and
+        it's affecting metrics - how do you weigh that against reliability risk that
+        hasn't caused an incident yet?"
+      - "How would you actually structure the conversation to get to a decision, not
+        just more debate?"
+      - "What data would change your position here?"
+
+  - id: multi_stakeholder_buyin
+    level: [staff, principal]
+    prompt: >
+      You need buy-in from Sales, Support, and Marketing for a technical change that
+      will have visible, temporary user-facing side effects (e.g. a brief feature
+      degradation during a migration). Walk me through how you'd get alignment.
+    seed_probes:
+      - "Support says this will spike ticket volume right before a high-traffic period
+        - how do you handle that objection?"
+      - "Sales says a specific enterprise customer will be upset - does that change
+        your plan, and how?"
+      - "How do you handle it if one of these stakeholders simply won't agree in
+        time?"
+
+  - id: data_contradicts_engineering
+    level: [senior, staff, principal]
+    prompt: >
+      Data Science tells you their analysis shows a recent change hurt a key metric,
+      but your team's own production monitoring shows no meaningful change. Walk me
+      through how you'd resolve this disagreement.
+    seed_probes:
+      - "The data scientist is confident in their methodology and pushes back when you
+        question it - how do you keep the conversation productive?"
+      - "How would you actually go about reconciling the two signals rather than just
+        picking a side?"
+      - "What do you do if you run out of time to fully resolve it before a decision
+        is needed?"
+
+  - id: competing_stakeholder_timelines
+    level: [staff, principal]
+    prompt: >
+      You're leading a project that touches Legal/Compliance and Marketing, and the
+      two have incompatible timelines: Legal wants more review time, Marketing has a
+      fixed external launch date. Walk me through how you'd handle this.
+    seed_probes:
+      - "Marketing says the launch date was already announced externally - how does
+        that change your options?"
+      - "Legal says they can't be rushed on a compliance review - how do you respond
+        to that specifically, versus a normal scheduling conflict?"
+      - "What would you actually propose as a resolution, and how do you present it to
+        both sides?"
+
+  - id: metric_ownership_disagreement
+    level: [staff, principal]
+    prompt: >
+      You and a peer PM disagree on which team's initiative should get credit - and
+      resourcing - for improving a shared company metric that both of your teams
+      contributed to. Walk me through how you'd handle this.
+    seed_probes:
+      - "The PM brings this to your shared skip-level manager before you've talked
+        directly - how do you respond?"
+      - "How do you avoid this becoming a recurring source of friction between your
+        teams?"
+      - "What would change your mind about how credit should actually be split?"
+
+  - id: post_launch_stakeholder_fallout
+    level: [principal]
+    prompt: >
+      A cross-functional launch you led went out on time but caused unexpected
+      customer complaints that Support and Sales are now escalating loudly, and some
+      stakeholders feel they weren't warned about the risk. Walk me through how you'd
+      handle the aftermath.
+    seed_probes:
+      - "A stakeholder says they would have blocked the launch had they known the
+        risk - were they actually informed, and how do you handle it either way?"
+      - "How do you rebuild trust with the stakeholders who feel blindsided?"
+      - "What process change, if any, would you make so this doesn't happen again?"

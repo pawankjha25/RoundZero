@@ -1,0 +1,53 @@
+round_type: coding
+version: 1
+owner: pawan
+status: active
+
+dimensions:
+  - key: problem_understanding
+    label: Problem understanding / clarification
+    weight: 0.10
+  - key: approach_communication
+    label: Approach & thinking out loud
+    weight: 0.15
+  - key: correctness
+    label: Correctness
+    weight: 0.20
+  - key: complexity_analysis
+    label: Time / space complexity
+    weight: 0.15
+  - key: code_quality
+    label: Code quality / structure
+    weight: 0.10
+  - key: testing_edge_cases
+    label: Testing & edge cases
+    weight: 0.10
+  - key: debugging
+    label: Debugging when something breaks
+    weight: 0.10
+  - key: communication
+    label: Communication
+    weight: 0.10
+    note: >
+      Mirrors ml_system_design's own inclusion of communication as its own
+      scored dimension - see rubrics/ml_system_design/v1.yaml's note.
+
+scale:
+  1: "Below bar - major gaps; needs substantial help."
+  2: "Developing - understands the area but misses important considerations."
+  3: "Meets target - independently handles expected target-level reasoning."
+  4: "Exceeds target - deep reasoning, anticipates problems, makes sophisticated trade-offs."
+
+evidence_format: >
+  Every dimension score must be accompanied by a short evidence narrative synthesized
+  from the underlying EvidenceItems (PRD Appendix B), not a bare number. Example:
+  "Correctness - 3/4. Final solution passed all provided test cases including the
+  empty-input edge case, but candidate needed a hint to catch a duplicate-key bug on
+  the first pass."
+
+readiness_computation: >
+  Overall readiness percentage and hire signal (e.g. LEAN HIRE) are deterministic
+  functions of the weighted dimension scores plus level-criticality rules - never
+  generated directly by the model. Same computation as every other round type
+  (roundzero.evaluation.evaluator.compute_readiness) - only the dimensions/weights
+  above are round-type-specific.

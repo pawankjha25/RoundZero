@@ -1,0 +1,302 @@
+version: 1
+round_type: coding
+
+scenarios:
+  - id: two_sum
+    level: [senior, staff, principal]
+    title: "Two Sum"
+    prompt: >
+      Given an array of integers nums and an integer target, return the indices of the
+      two numbers such that they add up to target. Assume exactly one valid answer
+      exists and the same element may not be used twice.
+    constraints:
+      - "2 <= nums.length <= 10^4"
+      - "Exactly one valid answer exists."
+      - "You may not use the same element twice."
+    entry_point: two_sum
+    starter_code_python: |
+      def two_sum(nums, target):
+          # Return indices of the two numbers that add up to target.
+          pass
+    test_cases:
+      - name: example_1
+        input: "[[2, 7, 11, 15], 9]"
+        expected_output: "[0, 1]"
+      - name: example_2
+        input: "[[3, 2, 4], 6]"
+        expected_output: "[1, 2]"
+      - name: example_3
+        input: "[[3, 3], 6]"
+        expected_output: "[0, 1]"
+    seed_probes:
+      - "Your first pass was brute force - what's the time complexity, and can you get it down to O(n)?"
+      - "What would you do differently if nums were already sorted?"
+      - "How would this change if the array were too large to fit in memory?"
+
+  - id: valid_parentheses
+    level: [senior, staff, principal]
+    title: "Valid Parentheses"
+    prompt: >
+      Given a string containing just the characters '(', ')', '{', '}', '[' and ']',
+      determine if the input string is valid: every open bracket must be closed by the
+      same type of bracket, and in the correct order.
+    constraints:
+      - "1 <= s.length <= 10^4 (empty string is treated as valid)"
+      - "s consists only of bracket characters."
+    entry_point: is_valid
+    starter_code_python: |
+      def is_valid(s):
+          # Return True if the brackets in s are balanced and correctly nested.
+          pass
+    test_cases:
+      - name: example_1
+        input: "[\"()[]{}\"]"
+        expected_output: "true"
+      - name: example_2
+        input: "[\"(]\"]"
+        expected_output: "false"
+      - name: example_3
+        input: "[\"([)]\"]"
+        expected_output: "false"
+      - name: empty_string
+        input: "[\"\"]"
+        expected_output: "true"
+    seed_probes:
+      - "Why does a stack fit this problem better than, say, counting open/close characters?"
+      - "What's the space complexity, and can it ever be better than O(n)?"
+      - "How would you extend this to also validate a custom bracket pair like '<>'?"
+
+  - id: best_time_to_buy_sell_stock
+    level: [senior, staff, principal]
+    title: "Best Time to Buy and Sell Stock"
+    prompt: >
+      Given an array where prices[i] is the price of a stock on day i, find the maximum
+      profit from buying on one day and selling on a later day. If no profit is
+      possible, return 0.
+    constraints:
+      - "1 <= prices.length <= 10^5"
+      - "Exactly one buy and one sell (or none)."
+    entry_point: max_profit
+    starter_code_python: |
+      def max_profit(prices):
+          # Return the maximum achievable profit from one buy and one later sell.
+          pass
+    test_cases:
+      - name: example_1
+        input: "[[7, 1, 5, 3, 6, 4]]"
+        expected_output: "5"
+      - name: monotonic_decreasing
+        input: "[[7, 6, 4, 3, 1]]"
+        expected_output: "0"
+      - name: two_days
+        input: "[[1, 2]]"
+        expected_output: "1"
+    seed_probes:
+      - "What's the brute-force complexity here, and how did you get to a single pass?"
+      - "How would the problem change if you were allowed multiple buy/sell transactions?"
+      - "What if prices arrived as a live stream instead of a fixed array?"
+
+  - id: maximum_subarray
+    level: [staff, principal]
+    title: "Maximum Subarray"
+    prompt: >
+      Given an integer array nums, find the contiguous subarray (containing at least
+      one number) with the largest sum, and return that sum.
+    constraints:
+      - "1 <= nums.length <= 10^5"
+      - "Array may contain negative numbers."
+    entry_point: max_subarray
+    starter_code_python: |
+      def max_subarray(nums):
+          # Return the sum of the contiguous subarray with the largest sum.
+          pass
+    test_cases:
+      - name: example_1
+        input: "[[-2, 1, -3, 4, -1, 2, 1, -5, 4]]"
+        expected_output: "6"
+      - name: single_element
+        input: "[[1]]"
+        expected_output: "1"
+      - name: all_positive
+        input: "[[5, 4, -1, 7, 8]]"
+        expected_output: "23"
+    seed_probes:
+      - "Walk me through why Kadane's algorithm works - what invariant are you maintaining at each step?"
+      - "How would you also return the actual subarray, not just its sum?"
+      - "Can this be solved with divide and conquer instead? What's the complexity trade-off?"
+
+  - id: reverse_integer
+    level: [senior, staff]
+    title: "Reverse Integer"
+    prompt: >
+      Given a signed 32-bit integer x, return x with its digits reversed. If reversing
+      x causes the value to go outside the signed 32-bit integer range
+      [-2^31, 2^31 - 1], return 0.
+    constraints:
+      - "-2^31 <= x <= 2^31 - 1"
+    entry_point: reverse_integer
+    starter_code_python: |
+      def reverse_integer(x):
+          # Return x with digits reversed, or 0 on 32-bit signed overflow.
+          pass
+    test_cases:
+      - name: positive
+        input: "[123]"
+        expected_output: "321"
+      - name: negative
+        input: "[-123]"
+        expected_output: "-321"
+      - name: trailing_zero
+        input: "[120]"
+        expected_output: "21"
+      - name: overflow
+        input: "[1534236469]"
+        expected_output: "0"
+    seed_probes:
+      - "Python integers don't overflow the way a 32-bit int does - how do you actually detect the overflow case?"
+      - "What would you need to change to solve this without ever converting to a string?"
+      - "How would you handle this in a language with fixed-width integers, like Java or C++?"
+
+  - id: contains_duplicate
+    level: [senior, staff, principal]
+    title: "Contains Duplicate"
+    prompt: >
+      Given an integer array nums, return true if any value appears at least twice in
+      the array, and false if every element is distinct.
+    constraints:
+      - "1 <= nums.length <= 10^5"
+    entry_point: contains_duplicate
+    starter_code_python: |
+      def contains_duplicate(nums):
+          # Return True if any value appears more than once.
+          pass
+    test_cases:
+      - name: has_duplicate
+        input: "[[1, 2, 3, 1]]"
+        expected_output: "true"
+      - name: all_distinct
+        input: "[[1, 2, 3, 4]]"
+        expected_output: "false"
+      - name: many_duplicates
+        input: "[[1, 1, 1, 3, 3, 4, 3, 2, 4, 2]]"
+        expected_output: "true"
+    seed_probes:
+      - "What's the trade-off between the hash-set approach and sorting first?"
+      - "How would your answer change under a strict memory budget that ruled out a hash set?"
+      - "How would you adapt this to report which values were duplicated, not just whether any were?"
+
+  - id: missing_number
+    level: [senior, staff]
+    title: "Missing Number"
+    prompt: >
+      Given an array nums containing n distinct numbers taken from the range
+      [0, n], return the one number in that range that is missing from the array.
+    constraints:
+      - "1 <= n <= 10^4"
+      - "All numbers are unique."
+    entry_point: missing_number
+    starter_code_python: |
+      def missing_number(nums):
+          # Return the number in [0, n] missing from nums.
+          pass
+    test_cases:
+      - name: example_1
+        input: "[[3, 0, 1]]"
+        expected_output: "2"
+      - name: example_2
+        input: "[[0, 1]]"
+        expected_output: "2"
+      - name: example_3
+        input: "[[9, 6, 4, 2, 3, 5, 7, 0, 1]]"
+        expected_output: "8"
+    seed_probes:
+      - "You used the sum formula / XOR trick - what's the advantage over sorting first?"
+      - "What happens to your approach if more than one number could be missing?"
+      - "Does your solution risk integer overflow in a language without arbitrary-precision ints? How would you avoid it?"
+
+  - id: valid_palindrome
+    level: [senior, staff, principal]
+    title: "Valid Palindrome"
+    prompt: >
+      Given a string s, return true if it is a palindrome after converting all
+      uppercase letters to lowercase and removing all non-alphanumeric characters,
+      and false otherwise.
+    constraints:
+      - "1 <= s.length <= 2 * 10^5"
+      - "s consists of printable ASCII characters."
+    entry_point: is_palindrome
+    starter_code_python: |
+      def is_palindrome(s):
+          # Return True if s is a palindrome, ignoring case and non-alphanumeric characters.
+          pass
+    test_cases:
+      - name: example_1
+        input: "[\"A man, a plan, a canal: Panama\"]"
+        expected_output: "true"
+      - name: example_2
+        input: "[\"race a car\"]"
+        expected_output: "false"
+      - name: only_punctuation
+        input: "[\" \"]"
+        expected_output: "true"
+    seed_probes:
+      - "Why is the two-pointer approach better than building a cleaned string first and reversing it?"
+      - "What's the space complexity of your approach, and can it be O(1)?"
+      - "How would you handle Unicode letters, not just ASCII?"
+
+  - id: climbing_stairs
+    level: [staff, principal]
+    title: "Climbing Stairs"
+    prompt: >
+      You are climbing a staircase with n steps. Each time you can climb either 1 or 2
+      steps. Return the number of distinct ways to climb to the top.
+    constraints:
+      - "1 <= n <= 45"
+    entry_point: climbing_stairs
+    starter_code_python: |
+      def climbing_stairs(n):
+          # Return the number of distinct ways to climb n steps, taking 1 or 2 at a time.
+          pass
+    test_cases:
+      - name: n_equals_2
+        input: "[2]"
+        expected_output: "2"
+      - name: n_equals_3
+        input: "[3]"
+        expected_output: "3"
+      - name: n_equals_5
+        input: "[5]"
+        expected_output: "8"
+    seed_probes:
+      - "This is structurally the same recurrence as another famous problem - which one, and why?"
+      - "Your first version was recursive - what happens to its complexity without memoization, and why?"
+      - "Can you get this down to O(1) space? Walk me through how."
+
+  - id: binary_search
+    level: [senior, staff, principal]
+    title: "Binary Search"
+    prompt: >
+      Given a sorted (ascending), zero-indexed integer array nums and an integer
+      target, return the index of target if it exists in nums, or -1 if it does not.
+    constraints:
+      - "1 <= nums.length <= 10^4"
+      - "nums is sorted in strictly ascending order."
+    entry_point: binary_search
+    starter_code_python: |
+      def binary_search(nums, target):
+          # Return the index of target in the sorted array nums, or -1 if absent.
+          pass
+    test_cases:
+      - name: found
+        input: "[[-1, 0, 3, 5, 9, 12], 9]"
+        expected_output: "4"
+      - name: not_found
+        input: "[[-1, 0, 3, 5, 9, 12], 2]"
+        expected_output: "-1"
+      - name: single_element
+        input: "[[5], 5]"
+        expected_output: "0"
+    seed_probes:
+      - "How do you avoid the classic (low + high) overflow bug, even though Python doesn't have fixed-width ints?"
+      - "What's an invariant you can state about the search space at the start of every loop iteration?"
+      - "How would you adapt this to find the first or last occurrence of a duplicated target?"

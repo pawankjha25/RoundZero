@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+/* Class-based dark mode (next-themes toggles a "dark" class on <html>, see
+   components/ThemeProvider.tsx) rather than Tailwind v4's default
+   prefers-color-scheme-only `dark:` variant - this lets the user's explicit
+   toggle win over their OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------
+   Design tokens (specs/003-premium-uiux-redesign - Phase 1: Design
+   Foundation). A restrained, professional visual system: neutral base, one
+   accent, and a small semantic status scale used consistently everywhere a
+   signal is shown (round result, evaluator claims, connection state) -
+   never color alone, always paired with a label/icon per the spec's
+   accessibility requirement (see components using status-* tokens).
+
+   Values live as plain CSS variables (light in :root, dark override in
+   .dark) and are re-exposed to Tailwind via `@theme inline`, which is what
+   turns e.g. --color-accent into real utilities: bg-accent, text-accent,
+   border-accent, etc. This is additive - existing neutral-NNN utility
+   classes elsewhere in the app keep working untouched; new/rebuilt screens
+   should prefer these semantic tokens instead of ad-hoc neutral-NNN so the
+   palette can move in one place later. */
+:root {
+  --background: oklch(0.995 0 0);
+  --surface: oklch(1 0 0);
+  --foreground: oklch(0.19 0 0);
+  --muted: oklch(0.96 0 0);
+  /* 2026-09-03: darkened 0.47 -> 0.35 (dark mode: 0.66 -> 0.78) - user
+     report of subtitles/metadata across the app ("Where you left off, and
+     what's next.", loop card meta lines) reading as "very light grey".
+     0.47 already cleared WCAG AA numerically (~6.7:1 against background)
+     but numeric contrast doesn't capture perceived weight, same gap already
+     called out below for --text-label - this token gets the same crisper
+     treatment app-wide in one place instead of a per-component patch.
+     ~11:1 against background/surface now, still clearly lighter than
+     --foreground's ~18:1 so the muted/secondary hierarchy is intact. */
+  --muted-foreground: oklch(0.35 0 0);
+  /* border/border-strong tuned to real WCAG 1.4.11 non-text contrast
+     (>=3:1 against background/surface) - the original 0.9/0.8 lightness
+     values measured ~1.3:1 and ~1.8:1, too faint to read as a visible
+     input/card boundary. See CONTRAST_AUDIT.md for the full measurement. */
+  --border: oklch(0.66 0 0);
+  --border-strong: oklch(0.5 0 0);
+
+  /* One primary accent - a restrained indigo, not a "gradient AI product"
+     blue/purple. Used sparingly: primary CTAs, active states, focus rings. */
+  --accent: oklch(0.4 0.11 265);
+  --accent-foreground: oklch(0.98 0 0);
+
+  /* Semantic status scale (spec section 31 "Visual System" /
+     roundzero.evaluation HIRE_SIGNAL_THRESHOLDS shape - strong positive
+     down to strong concern). Each has a text/border/soft-background triplet
+     so a badge can be built from tokens alone. */
+  --status-strong-positive: oklch(0.5 0.14 155);
+  --status-strong-positive-bg: oklch(0.95 0.04 155);
+  --status-positive: oklch(0.5 0.13 155);
+  --status-positive-bg: oklch(0.96 0.035 155);
+  --status-neutral: oklch(0.5 0.11 80);
+  --status-neutral-bg: oklch(0.96 0.03 80);
+  --status-concern: oklch(0.5 0.16 40);
+  --status-concern-bg: oklch(0.96 0.04 40);
+  --status-strong-concern: oklch(0.52 0.19 25);
+  --status-strong-concern-bg: oklch(0.96 0.04 25);
+}
+
+.dark {
+  --background: oklch(0.16 0 0);
+  --surface: oklch(0.2 0 0);
+  --foreground: oklch(0.95 0 0);
+  --muted: oklch(0.25 0 0);
+  --muted-foreground: oklch(0.78 0 0); /* see light-mode comment above */
+  --border: oklch(0.5 0 0);
+  --border-strong: oklch(0.6 0 0);
+
+  --accent: oklch(0.75 0.11 265);
+  --accent-foreground: oklch(0.15 0 0);
+
+  --status-strong-positive: oklch(0.72 0.15 155);
+  --status-strong-positive-bg: oklch(0.28 0.05 155);
+  --status-positive: oklch(0.68 0.14 155);
+  --status-positive-bg: oklch(0.26 0.045 155);
+  --status-neutral: oklch(0.72 0.1 80);
+  --status-neutral-bg: oklch(0.28 0.035 80);
+  --status-concern: oklch(0.7 0.15 40);
+  --status-concern-bg: oklch(0.28 0.05 40);
+  --status-strong-concern: oklch(0.68 0.18 25);
+  --status-strong-concern-bg: oklch(0.28 0.055 25);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-status-strong-positive: var(--status-strong-positive);
+  --color-status-strong-positive-bg: var(--status-strong-positive-bg);
+  --color-status-positive: var(--status-positive);
+  --color-status-positive-bg: var(--status-positive-bg);
+  --color-status-neutral: var(--status-neutral);
+  --color-status-neutral-bg: var(--status-neutral-bg);
+  --color-status-concern: var(--status-concern);
+  --color-status-concern-bg: var(--status-concern-bg);
+  --color-status-strong-concern: var(--status-strong-concern);
+  --color-status-strong-concern-bg: var(--status-strong-concern-bg);
+
+  /* Self-hosted Inter Variable (via @fontsource-variable/inter, imported in
+     app/layout.tsx) as the primary font - not next/font/google, which keeps
+     the build free of a network dependency on fonts.googleapis.com (this
+     repo's dev/build environment does not reliably have that reachable).
+     Switched from a pure OS-system-font stack because several system UI
+     fonts render capital L with a foot thin enough to be misread as I at
+     small sizes (e.g. "ML System Design" reading as "MI System Design") -
+     Inter does not have this ambiguity. OS fonts remain as the fallback
+     chain if the self-hosted font ever fails to load. */
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* Type scale (2026-09 UI/UX audit vs. interviewing.io - see the delivered
+     proposal doc). Named sizes, the same way colors are named tokens instead
+     of raw oklch() values sprinkled per component, so a component picks the
+     *role* of its text ("this is body copy the candidate has to read") and
+     gets a real size instead of a raw Tailwind text-xs/text-sm chosen ad hoc.
+     The audit found 223 uses of 12-14px text against 19 uses of 16px+ across
+     the app, including on the interview report and coding problem panel -
+     the two screens carrying the product's actual content. Two sizes only,
+     on purpose:
+       - text-body (16px/26px line-height): the floor for anything the
+         candidate or reader has to actually read - prose, feedback
+         narratives, problem statements, list items with real content.
+         interviewing.io's own body copy measures 18px; 16px (the browser's
+         own unscaled default) is the minimum bar, not a stretch goal.
+       - text-label (14px/18px line-height): reserved for short, uppercase,
+         tracked-out eyebrow labels and badges ("Strengths", "View evidence")
+         - never for prose or feedback content. This is the one legitimate
+           remaining use of small text; text-xs/text-sm elsewhere in the app
+           (buttons, form inputs, secondary metadata) are unaffected by this
+           change and don't need to migrate - this scale is additive, for new
+           and updated content-bearing text specifically.
+
+         2026-09-03 revision: bumped 13px->14px and, at every call site, the
+         color/weight pairing moved from text-muted-foreground/font-medium to
+         text-foreground/font-semibold (user report: labels read as "small
+         and dim" even though the old pairing passed WCAG contrast (6-6.7:1) -
+         numeric contrast doesn't capture perceived weight, and small size +
+         regular weight + letter-spacing + a muted gray compound in the same
+         direction. Matches the Linear/Stripe/Notion convention this app is
+         explicitly modeled on (section 42 of the P0 prompt): an eyebrow
+         label reads as "quiet" from its size/tracking/case, not from a
+         washed-out color - the color itself should be crisp. */
+  --text-body: 1rem;
+  --text-body--line-height: 1.625rem;
+  --text-label: 0.875rem;
+  --text-label--line-height: 1.125rem;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}

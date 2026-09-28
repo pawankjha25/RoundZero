@@ -1,0 +1,245 @@
+{
+  "id": "strong_architecture_weak_reliability",
+  "source": "synthetic",
+  "description": "Realistic mixed profile: strong on the heavily-weighted architecture/modeling/serving dimensions, weak on reliability and cost - a common staff-level gap pattern.",
+  "transcript": [
+    {
+      "speaker": "interviewer",
+      "text": "Let's clarify scale first - how many requests per second, and what's the latency budget?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "framing"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "We're looking at roughly 50k requests per second at peak, sub-100ms p99, with hard isolation between tenants.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "Walk me through the high-level components and how they connect.",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "architecture"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "A gateway routes to per-tenant model servers behind an autoscaling pool, with a shared feature cache in front.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "Walk me through the high-level components and how they connect.",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "architecture"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "A gateway routes to per-tenant model servers behind an autoscaling pool, with a shared feature cache in front.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "Walk me through the high-level components and how they connect.",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "architecture"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "A gateway routes to per-tenant model servers behind an autoscaling pool, with a shared feature cache in front.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "What model architecture are you choosing here, and why not a simpler one?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "modeling"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "I'd start with a distilled model for the low-latency path and reserve the larger model for tenants that can tolerate more latency.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "What model architecture are you choosing here, and why not a simpler one?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "modeling"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "I'd start with a distilled model for the low-latency path and reserve the larger model for tenants that can tolerate more latency.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "What model architecture are you choosing here, and why not a simpler one?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "modeling"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "I'd start with a distilled model for the low-latency path and reserve the larger model for tenants that can tolerate more latency.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "How would you get labeled training data for this, and how often do you retrain?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "data_training"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "Labels come from a delayed-feedback pipeline, and we'd retrain weekly with a shadow-eval gate before promotion.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "Traffic spikes 10x during peak - how does your serving layer handle that?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "serving_scalability"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "Autoscaling on queue depth rather than CPU, with a pre-warmed buffer pool so a 10x spike doesn't cold-start GPUs.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "Traffic spikes 10x during peak - how does your serving layer handle that?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "serving_scalability"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "Autoscaling on queue depth rather than CPU, with a pre-warmed buffer pool so a 10x spike doesn't cold-start GPUs.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "Traffic spikes 10x during peak - how does your serving layer handle that?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "serving_scalability"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "Autoscaling on queue depth rather than CPU, with a pre-warmed buffer pool so a 10x spike doesn't cold-start GPUs.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "One region goes down. What happens to in-flight requests?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "reliability"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "Active-active across two regions with idempotent retries; in-flight requests fail over via a shared request log.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "How would you know in production if this model's quality degraded?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "evaluation_monitoring"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "We'd track prediction drift against a held-out reference distribution and alert when it crosses a threshold, not just watch offline accuracy.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "You chose consistency over availability here - walk me through that trade-off.",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "trade_offs"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "I chose availability over strict consistency here since a slightly stale ranking is better than a failed request for this use case.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "Can you summarize your design so far in a couple of sentences?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "communication"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "So to summarize: a multi-tenant gateway with per-tenant isolation, autoscaled serving, and drift-based monitoring feeding weekly retraining.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    }
+  ],
+  "final_coverage": {
+    "framing": "COVERED",
+    "architecture": "COVERED",
+    "modeling": "COVERED",
+    "data_training": "COVERED",
+    "serving_scalability": "COVERED",
+    "reliability": "WEAK",
+    "evaluation_monitoring": "WEAK",
+    "cost_efficiency": "NOT_COVERED",
+    "trade_offs": "COVERED",
+    "communication": "COVERED"
+  },
+  "expected": {
+    "dimension_scores": {
+      "framing": 3,
+      "architecture": 4,
+      "modeling": 4,
+      "data_training": 3,
+      "serving_scalability": 4,
+      "reliability": 2,
+      "evaluation_monitoring": 2,
+      "cost_efficiency": 1,
+      "trade_offs": 3,
+      "communication": 3
+    },
+    "readiness_pct": 72,
+    "hire_signal": "HIRE"
+  }
+}

@@ -1,0 +1,124 @@
+"""
+Supabase JWT verification - replaces the Milestone 1 cookie-session auth
+(apps.api.models.SessionToken is now dead - Supabase issues and manages
+sessions, the backend only verifies them). Every request must carry
+`Authorization: Bearer <supabase access token>`.
+
+Verification is JWKS-based (SUPABASE_URL -> <url>/auth/v1/.well-known/jwks.json),
+not a static HS256 shared secret: Supabase's newer projects sign access tokens
+with an asymmetric key (ES256 by default) and only publish the *public* half at
+the JWKS endpoint, so the backend never holds a signing secret at all. This
+also means a project that later rotates its signing key (Supabase dashboard ->
+Settings -> JWT Keys) needs no backend redeploy - PyJWKClient picks the right
+public key by the token's `kid` header automatically. (Older Supabase projects
+that still use the legacy HS256 shared secret are not supported here; migrate
+via the Supabase dashboard's JWT Keys page if you're on one.)
+
+On first verification for a given Supabase user, upserts a local "shadow
+profile" row (apps.api.models.User) keyed by the token's `sub` claim, so
+RoundAttempt/etc. still have a local user_id to join against without
+duplicating Supabase's own auth.users table.
+
+Admin access (get_current_admin below) is a plain email allowlist read from
+ADMIN_EMAILS (comma-separated, case-insensitive) - not a DB column. There's
+no user-management UI to safely flip a stored is_admin flag yet, and an
+allowlist is config (.env), not a hardcoded value or a manual DB edit: adding
+or removing an admin is a redeploy-free env var change.
+"""
+from __future__ import annotations
+
+import os
+from functools import lru_cache
+
+import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session as DBSession
+
+from apps.api.db import get_db
+from apps.api.models import User
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+@lru_cache(maxsize=1)
+def _jwks_client() -> jwt.PyJWKClient:
+    supabase_url = os.environ.get("SUPABASE_URL")
+    if not supabase_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SUPABASE_URL is not set on the server - see .env.example",
+        )
+    jwks_url = f"{supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
+    return jwt.PyJWKClient(jwks_url, cache_keys=True)
+
+
+def _decode(token: str) -> dict:
+    try:
+        signing_key = _jwks_client().get_signing_key_from_jwt(token)
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["ES256", "RS256"],
+            audience="authenticated",
+        )
+    except jwt.PyJWTError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired session") from exc
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: DBSession = Depends(get_db),
+) -> User:
+    if credentials is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+
+    claims = _decode(credentials.credentials)
+    user_id = claims["sub"]
+    email = claims.get("email", "")
+    metadata = claims.get("user_metadata") or {}
+    name = metadata.get("full_name") or metadata.get("name") or email
+
+    user = db.get(User, user_id)
+    if user is None:
+        user = User(id=user_id, email=email, name=name)
+        db.add(user)
+        try:
+            db.commit()
+        except IntegrityError:
+            # Two concurrent first-time requests for the same brand-new
+            # Supabase user both saw no existing row and both tried to
+            # insert one - e.g. Next.js dev mode's React Strict Mode
+            # double-invokes effects, so the dashboard's me() call fires
+            # twice on mount. The loser hits a primary-key/unique
+            # collision here; that's not an auth failure, the winner's row
+            # is exactly what we would have written, so just read it back
+            # instead of 500ing this request.
+            db.rollback()
+            user = db.get(User, user_id)
+            if user is None:
+                raise
+        else:
+            db.refresh(user)
+    elif user.email != email or (name and user.name != name):
+        user.email = email
+        user.name = name or user.name
+        db.commit()
+        db.refresh(user)
+    return user
+
+
+def _admin_emails() -> set[str]:
+    raw = os.environ.get("ADMIN_EMAILS", "")
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
+def is_admin_email(email: str) -> bool:
+    return bool(email) and email.lower() in _admin_emails()
+
+
+def get_current_admin(user: User = Depends(get_current_user)) -> User:
+    if not is_admin_email(user.email):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return user

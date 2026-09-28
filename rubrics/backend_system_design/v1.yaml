@@ -1,0 +1,50 @@
+round_type: backend_system_design
+version: 1
+owner: pawan
+status: active
+
+dimensions:
+  - key: requirements_scoping
+    label: Requirements & scoping
+    weight: 0.15
+  - key: api_data_modeling
+    label: API & data modeling
+    weight: 0.15
+  - key: high_level_architecture
+    label: High-level architecture
+    weight: 0.20
+  - key: scalability_performance
+    label: Scalability & performance
+    weight: 0.15
+  - key: reliability_availability
+    label: Reliability & availability
+    weight: 0.15
+  - key: tradeoffs_reasoning
+    label: Trade-offs reasoning
+    weight: 0.10
+  - key: communication
+    label: Communication
+    weight: 0.10
+    note: >
+      Mirrors ml_system_design's and coding's own inclusion of communication
+      as its own scored dimension - see rubrics/ml_system_design/v1.yaml's note.
+
+scale:
+  1: "Below bar - major gaps; needs substantial help."
+  2: "Developing - reasonable design but misses important considerations."
+  3: "Meets target - independently produces a target-level design with sound trade-offs."
+  4: "Exceeds target - anticipates failure modes, quantifies trade-offs, and defends design choices under pressure."
+
+evidence_format: >
+  Every dimension score must be accompanied by a short evidence narrative synthesized
+  from the underlying EvidenceItems (PRD Appendix B), not a bare number. Example:
+  "Scalability & performance - 3/4. Proposed consistent hashing to shard the key-value
+  store and correctly reasoned about hot-shard risk when asked, but did not estimate
+  actual QPS or storage numbers unprompted."
+
+readiness_computation: >
+  Overall readiness percentage and hire signal (e.g. LEAN HIRE) are deterministic
+  functions of the weighted dimension scores plus level-criticality rules - never
+  generated directly by the model. Same computation as every other round type
+  (roundzero.evaluation.evaluator.compute_readiness) - only the dimensions/weights
+  above are round-type-specific.

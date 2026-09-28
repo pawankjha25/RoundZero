@@ -1,0 +1,94 @@
+version: 1
+round_type: backend_system_design
+
+scenarios:
+  - id: url_shortener
+    level: [senior, staff, principal]
+    prompt: >
+      Design a URL shortening service like bit.ly: given a long URL, generate a short
+      alias that redirects to it, at scale.
+    seed_probes:
+      - "How would you generate short codes so they don't collide, without a central
+        counter becoming a bottleneck?"
+      - "Reads vastly outnumber writes here - how does that shape your data store and
+        caching choices?"
+      - "How would you support custom aliases and expiring links without complicating
+        the hot read path?"
+
+  - id: rate_limiter
+    level: [senior, staff, principal]
+    prompt: >
+      Design a distributed rate limiter that can be used as a shared service by many
+      other backend services to limit requests per user per time window.
+    seed_probes:
+      - "Walk me through token bucket vs. sliding window log vs. sliding window
+        counter - what are the trade-offs?"
+      - "How do you keep rate limit counters consistent across multiple rate limiter
+        instances without a single point of failure?"
+      - "What happens to the system if the rate limiter itself becomes slow or
+        unavailable - should it fail open or fail closed, and why?"
+
+  - id: notification_system
+    level: [senior, staff, principal]
+    prompt: >
+      Design a notification system that can send push, email, and SMS notifications
+      to millions of users, triggered by many different internal services.
+    seed_probes:
+      - "How do you prevent the same event from triggering duplicate notifications if
+        an upstream service retries?"
+      - "How would you handle a third-party push provider being down or rate-limiting
+        you?"
+      - "How do you let users control notification preferences without every producer
+        service needing to know about them?"
+
+  - id: distributed_job_scheduler
+    level: [staff, principal]
+    prompt: >
+      Design a distributed job scheduler that lets internal teams schedule one-off and
+      recurring jobs (e.g. "run this at 3am daily") across a fleet of workers.
+    seed_probes:
+      - "How do you guarantee a scheduled job runs exactly once even if the node that
+        was supposed to trigger it crashes right before firing?"
+      - "How would you handle a job that consistently takes longer than its scheduled
+        interval?"
+      - "How does this scale to millions of scheduled jobs without a single scheduler
+        node becoming a bottleneck?"
+
+  - id: chat_system
+    level: [senior, staff, principal]
+    prompt: >
+      Design a one-on-one and group chat system like WhatsApp: users send messages
+      that are delivered in near real-time, and message history is available when a
+      user comes back online.
+    seed_probes:
+      - "How do you deliver a message to a currently-offline user once they reconnect,
+        without losing ordering?"
+      - "How would you scale this to support group chats with thousands of members?"
+      - "How do you handle a user with multiple active devices staying in sync?"
+
+  - id: inventory_reservation
+    level: [staff, principal]
+    prompt: >
+      Design an inventory/reservation system for an e-commerce checkout flow: many
+      concurrent buyers may try to purchase the last few units of the same item.
+    seed_probes:
+      - "Walk me through exactly how you prevent overselling when two requests for
+        the last unit arrive within milliseconds of each other."
+      - "What happens if a user reserves an item but abandons checkout - how and when
+        does that inventory get released?"
+      - "How would this design change under a flash-sale spike of 100x normal
+        traffic?"
+
+  - id: api_rate_and_quota_platform
+    level: [principal]
+    prompt: >
+      Design a multi-tenant API platform's quota and billing-metering system: track
+      per-customer API usage accurately enough to bill on it, while enforcing quotas
+      in real time.
+    seed_probes:
+      - "Real-time enforcement wants fast, approximate counters; billing wants exact
+        numbers - how do you reconcile that tension?"
+      - "How do you handle a burst of traffic from one tenant without it degrading
+        service for others sharing the same infrastructure?"
+      - "How would you detect and handle a bug that has been silently undercounting
+        usage for a week?"

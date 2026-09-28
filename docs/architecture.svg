@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 830" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#525252" />
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="980" height="830" fill="#fafafa" />
+  <text x="490" y="26" text-anchor="middle" font-size="16" font-weight="700" fill="#171717">Round Zero - V1 locked stack</text>
+
+  <!-- arrows first so boxes paint on top of the lines cleanly -->
+  <g stroke="#737373" stroke-width="1.5" marker-end="url(#arrow)" fill="none">
+    <line x1="400" y1="82" x2="200" y2="138" />
+    <line x1="500" y1="82" x2="700" y2="138" />
+    <line x1="710" y1="182" x2="710" y2="218" />
+    <line x1="660" y1="262" x2="545" y2="298" />
+    <line x1="710" y1="262" x2="710" y2="298" />
+    <line x1="765" y1="262" x2="870" y2="298" />
+    <line x1="545" y1="342" x2="680" y2="378" />
+    <line x1="710" y1="342" x2="720" y2="378" />
+    <line x1="870" y1="342" x2="800" y2="378" />
+    <line x1="185" y1="180" x2="440" y2="468" />
+    <line x1="720" y1="420" x2="565" y2="468" />
+    <line x1="510" y1="510" x2="510" y2="548" />
+    <line x1="510" y1="584" x2="510" y2="608" />
+    <line x1="510" y1="650" x2="510" y2="678" />
+    <line x1="510" y1="720" x2="510" y2="748" />
+  </g>
+
+  <g font-size="12.5" fill="#171717">
+    <rect x="350" y="40" width="200" height="42" rx="8" fill="#ffffff" stroke="#a3a3a3" />
+    <text x="450" y="66" text-anchor="middle">Next.js / Vercel (UI)</text>
+
+    <rect x="100" y="138" width="170" height="42" rx="8" fill="#ffffff" stroke="#a3a3a3" />
+    <text x="185" y="164" text-anchor="middle">FastAPI (BFF)</text>
+
+    <rect x="620" y="138" width="180" height="42" rx="8" fill="#ffffff" stroke="#a3a3a3" />
+    <text x="710" y="164" text-anchor="middle">LiveKit Cloud</text>
+
+    <rect x="620" y="218" width="180" height="42" rx="8" fill="#ffffff" stroke="#a3a3a3" />
+    <text x="710" y="244" text-anchor="middle">LiveKit Agents worker</text>
+
+    <rect x="460" y="298" width="140" height="44" rx="8" fill="#eef2ff" stroke="#818cf8" />
+    <text x="530" y="317" text-anchor="middle" font-size="11.5">Deepgram</text>
+    <text x="530" y="332" text-anchor="middle" font-size="11.5">Nova-3 (STT)</text>
+
+    <rect x="640" y="298" width="140" height="44" rx="8" fill="#eef2ff" stroke="#818cf8" />
+    <text x="710" y="317" text-anchor="middle" font-size="11.5">Gemini 2.5</text>
+    <text x="710" y="332" text-anchor="middle" font-size="11.5">Flash (live)</text>
+
+    <rect x="810" y="298" width="140" height="44" rx="8" fill="#eef2ff" stroke="#818cf8" />
+    <text x="880" y="317" text-anchor="middle" font-size="11.5">Deepgram</text>
+    <text x="880" y="332" text-anchor="middle" font-size="11.5">Aura-2 (TTS)</text>
+
+    <rect x="620" y="378" width="180" height="42" rx="8" fill="#ffffff" stroke="#a3a3a3" />
+    <text x="710" y="404" text-anchor="middle">AI Interviewer (live loop)</text>
+
+    <rect x="400" y="468" width="220" height="42" rx="8" fill="#ffffff" stroke="#525252" stroke-width="1.5" />
+    <text x="510" y="494" text-anchor="middle" font-weight="600">Supabase / Postgres</text>
+
+    <rect x="420" y="548" width="180" height="36" rx="18" fill="#f5f5f5" stroke="#a3a3a3" />
+    <text x="510" y="571" text-anchor="middle" font-size="11.5">Interview completed</text>
+
+    <rect x="370" y="608" width="280" height="42" rx="8" fill="#fef3c7" stroke="#d97706" />
+    <text x="510" y="634" text-anchor="middle">Gemini 2.5 Flash-Lite - extraction</text>
+
+    <rect x="370" y="678" width="280" height="42" rx="8" fill="#dcfce7" stroke="#16a34a" />
+    <text x="510" y="704" text-anchor="middle">GPT-5 mini - independent evaluator</text>
+
+    <rect x="370" y="748" width="280" height="42" rx="8" fill="#dcfce7" stroke="#16a34a" />
+    <text x="510" y="774" text-anchor="middle">GPT-5 mini - report + improvement plan</text>
+  </g>
+
+  <text x="490" y="812" text-anchor="middle" font-size="11" fill="#737373">
+    Different vendor for interviewer (Gemini) vs. evaluator (OpenAI) on purpose - CLAUDE.md decision 4.
+  </text>
+</svg>

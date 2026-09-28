@@ -1,0 +1,109 @@
+name: competencies
+version: 1
+owner: pawan
+status: active
+purpose: >
+  Cross-round competency layer for the world-model interviewer
+  (specs/005-world-model-interviewer). The belief state tracks one level per
+  competency below. Existing per-round rubric dimensions map onto these via
+  dimension_map; a dimension mapped to null (e.g. communication) is scored
+  inside every competency rather than as its own axis. Decided 2026-09-28.
+  Changing this list invalidates likelihood tables, labels and trends - bump
+  the version instead of editing in place.
+
+levels:
+  - key: below_senior
+    label: Below Senior
+  - key: senior
+    label: Senior
+  - key: staff
+    label: Staff
+  - key: principal
+    label: Principal
+
+competencies:
+  - key: problem_framing
+    label: Problem framing
+    measures: Turning a vague ask into goals, metrics and constraints
+    staff_vs_senior: Questions the problem itself and ties it to business impact
+    probe_intent: Ask them to pin down the goal, success metric or a constraint they have not stated
+  - key: ml_system_design
+    label: ML system design
+    measures: "End-to-end architecture: data, training, serving, feedback loops"
+    staff_vs_senior: Designs for scale, failure and evolution, not just the happy path
+    probe_intent: Push on how the design holds up at larger scale or as requirements change
+  - key: ml_depth
+    label: ML depth
+    measures: Modeling choices, evaluation, and debugging model behaviour
+    staff_vs_senior: Explains why a method works and when it breaks
+    probe_intent: Ask why their modeling choice works and when it would break
+  - key: tradeoffs_judgment
+    label: Trade-offs and judgment
+    measures: Cost, latency, quality and risk decisions
+    staff_vs_senior: Names the trade-off unprompted and defends a choice
+    probe_intent: Ask what they are giving up with their choice and what would change their mind
+  - key: production_reliability
+    label: Production and reliability
+    measures: Monitoring, drift, rollout, incident thinking
+    staff_vs_senior: Plans for what goes wrong after launch
+    probe_intent: Ask what breaks after launch and how they would detect and recover from it
+  - key: leadership_influence
+    label: Leadership and influence
+    measures: Driving decisions across teams, mentoring, scope
+    staff_vs_senior: Examples of changing direction beyond their own team
+    probe_intent: Ask for a concrete example of influencing a decision outside their own team
+
+# round_type -> rubric dimension key -> competency key (or null = cross-cutting)
+dimension_map:
+  ml_system_design:
+    framing: problem_framing
+    architecture: ml_system_design
+    modeling: ml_depth
+    data_training: ml_system_design
+    serving_scalability: ml_system_design
+    reliability: production_reliability
+    evaluation_monitoring: production_reliability
+    cost_efficiency: tradeoffs_judgment
+    trade_offs: tradeoffs_judgment
+    communication: null
+  backend_system_design:
+    requirements_scoping: problem_framing
+    api_data_modeling: ml_system_design
+    high_level_architecture: ml_system_design
+    scalability_performance: ml_system_design
+    reliability_availability: production_reliability
+    tradeoffs_reasoning: tradeoffs_judgment
+    communication: null
+  ml_depth:
+    conceptual_understanding: ml_depth
+    mathematical_reasoning: ml_depth
+    tradeoffs_intuition: tradeoffs_judgment
+    applied_reasoning: ml_depth
+    debugging_diagnosis: ml_depth
+    breadth: ml_depth
+    communication: null
+  technical_leadership:
+    technical_vision_strategy: leadership_influence
+    mentorship_growth: leadership_influence
+    conflict_resolution: leadership_influence
+    cross_team_influence: leadership_influence
+    decision_making_ambiguity: tradeoffs_judgment
+    communication: null
+  xfn:
+    stakeholder_alignment: leadership_influence
+    prioritization_tradeoffs: tradeoffs_judgment
+    data_informed_decisions: problem_framing
+    handling_disagreement: leadership_influence
+    execution_followthrough: leadership_influence
+    communication: null
+  coding:
+    # Coding has no dedicated competency in v1 (open question in the design
+    # doc). Only the two dimensions that clearly fit are mapped.
+    problem_understanding: problem_framing
+    approach_communication: null
+    correctness: null
+    complexity_analysis: tradeoffs_judgment
+    code_quality: null
+    testing_edge_cases: null
+    debugging: null
+    communication: null

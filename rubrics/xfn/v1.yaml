@@ -1,0 +1,47 @@
+round_type: xfn
+version: 1
+owner: pawan
+status: active
+
+dimensions:
+  - key: stakeholder_alignment
+    label: Stakeholder alignment
+    weight: 0.20
+  - key: prioritization_tradeoffs
+    label: Prioritization & trade-offs
+    weight: 0.20
+  - key: data_informed_decisions
+    label: Data-informed decisions
+    weight: 0.15
+  - key: handling_disagreement
+    label: Handling disagreement
+    weight: 0.15
+  - key: execution_followthrough
+    label: Execution & follow-through
+    weight: 0.15
+  - key: communication
+    label: Communication
+    weight: 0.15
+    note: >
+      Mirrors every other round type's own inclusion of communication as its
+      own scored dimension - see rubrics/ml_system_design/v1.yaml's note.
+
+scale:
+  1: "Below bar - major gaps; needs substantial help."
+  2: "Developing - shows some cross-functional instinct but misses important considerations."
+  3: "Meets target - independently navigates the situation the way a target-level candidate would."
+  4: "Exceeds target - proactively surfaces trade-offs, brings stakeholders along, and shows judgment beyond the immediate ask."
+
+evidence_format: >
+  Every dimension score must be accompanied by a short evidence narrative synthesized
+  from the underlying EvidenceItems (PRD Appendix B), not a bare number. Example:
+  "Prioritization & trade-offs - 3/4. Proposed shipping a scoped-down version to hit the
+  PM's deadline while explicitly naming what was cut and why, but did not quantify the
+  cost of the cut features when pressed."
+
+readiness_computation: >
+  Overall readiness percentage and hire signal (e.g. LEAN HIRE) are deterministic
+  functions of the weighted dimension scores plus level-criticality rules - never
+  generated directly by the model. Same computation as every other round type
+  (roundzero.evaluation.evaluator.compute_readiness) - only the dimensions/weights
+  above are round-type-specific.

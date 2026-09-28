@@ -1,0 +1,58 @@
+round_type: ml_system_design
+version: 1
+owner: pawan
+status: active
+
+dimensions:
+  - key: framing
+    label: Problem framing / requirements
+    weight: 0.10
+  - key: architecture
+    label: High-level architecture
+    weight: 0.15
+  - key: modeling
+    label: ML / model reasoning
+    weight: 0.15
+  - key: data_training
+    label: Data / training
+    weight: 0.10
+  - key: serving_scalability
+    label: Serving / scalability
+    weight: 0.15
+  - key: reliability
+    label: Reliability
+    weight: 0.10
+  - key: evaluation_monitoring
+    label: Evaluation / monitoring
+    weight: 0.10
+  - key: cost_efficiency
+    label: Cost / efficiency
+    weight: 0.05
+  - key: trade_offs
+    label: Trade-off reasoning
+    weight: 0.05
+  - key: communication
+    label: Communication
+    weight: 0.05
+    note: >
+      Not in PRD section 7's literal dimension list for this round - deliberate
+      addition. See specs/001-ml-system-design-vertical-slice/plan.md.
+
+scale:
+  1: "Below bar - major gaps; needs substantial help."
+  2: "Developing - understands the area but misses important considerations."
+  3: "Meets target - independently handles expected target-level reasoning."
+  4: "Exceeds target - deep reasoning, anticipates problems, makes sophisticated trade-offs."
+
+evidence_format: >
+  Every dimension score must be accompanied by a short evidence narrative synthesized
+  from the underlying EvidenceItems (PRD Appendix B), not a bare number. Example:
+  "Reliability - 2/4. Candidate proposed single-region deployment. Regional failure was
+  not considered until interviewer prompted it. After prompting, candidate proposed
+  active/passive failover but did not discuss state synchronization or recovery
+  objectives."
+
+readiness_computation: >
+  Overall readiness percentage and hire signal (e.g. LEAN HIRE) are deterministic
+  functions of the weighted dimension scores plus level-criticality rules - never
+  generated directly by the model. See specs/001-ml-system-design-vertical-slice/plan.md.

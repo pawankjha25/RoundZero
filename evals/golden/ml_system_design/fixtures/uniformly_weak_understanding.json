@@ -1,0 +1,175 @@
+{
+  "id": "uniformly_weak_understanding",
+  "source": "synthetic",
+  "description": "Every dimension WEAK - candidate understood the areas but missed important considerations everywhere. Should land NO HIRE (33% readiness, below the 35% LEAN NO HIRE floor).",
+  "transcript": [
+    {
+      "speaker": "interviewer",
+      "text": "Let's clarify scale first - how many requests per second, and what's the latency budget?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "framing"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "We're looking at roughly 50k requests per second at peak, sub-100ms p99, with hard isolation between tenants.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "Walk me through the high-level components and how they connect.",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "architecture"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "A gateway routes to per-tenant model servers behind an autoscaling pool, with a shared feature cache in front.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "What model architecture are you choosing here, and why not a simpler one?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "modeling"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "I'd start with a distilled model for the low-latency path and reserve the larger model for tenants that can tolerate more latency.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "How would you get labeled training data for this, and how often do you retrain?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "data_training"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "Labels come from a delayed-feedback pipeline, and we'd retrain weekly with a shadow-eval gate before promotion.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "Traffic spikes 10x during peak - how does your serving layer handle that?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "serving_scalability"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "Autoscaling on queue depth rather than CPU, with a pre-warmed buffer pool so a 10x spike doesn't cold-start GPUs.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "One region goes down. What happens to in-flight requests?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "reliability"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "Active-active across two regions with idempotent retries; in-flight requests fail over via a shared request log.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "How would you know in production if this model's quality degraded?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "evaluation_monitoring"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "We'd track prediction drift against a held-out reference distribution and alert when it crosses a threshold, not just watch offline accuracy.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "This design uses a lot of GPU capacity - how would you bring the cost down?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "cost_efficiency"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "Batching small-tenant traffic onto shared GPU pools and falling back to CPU for tenants under a size threshold.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "You chose consistency over availability here - walk me through that trade-off.",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "trade_offs"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "I chose availability over strict consistency here since a slightly stale ranking is better than a failed request for this use case.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    },
+    {
+      "speaker": "interviewer",
+      "text": "Can you summarize your design so far in a couple of sentences?",
+      "phase": "high_level_design",
+      "competency_tags": [
+        "communication"
+      ]
+    },
+    {
+      "speaker": "candidate",
+      "text": "So to summarize: a multi-tenant gateway with per-tenant isolation, autoscaled serving, and drift-based monitoring feeding weekly retraining.",
+      "phase": "high_level_design",
+      "competency_tags": []
+    }
+  ],
+  "final_coverage": {
+    "framing": "WEAK",
+    "architecture": "WEAK",
+    "modeling": "WEAK",
+    "data_training": "WEAK",
+    "serving_scalability": "WEAK",
+    "reliability": "WEAK",
+    "evaluation_monitoring": "WEAK",
+    "cost_efficiency": "WEAK",
+    "trade_offs": "WEAK",
+    "communication": "WEAK"
+  },
+  "expected": {
+    "dimension_scores": {
+      "framing": 2,
+      "architecture": 2,
+      "modeling": 2,
+      "data_training": 2,
+      "serving_scalability": 2,
+      "reliability": 2,
+      "evaluation_monitoring": 2,
+      "cost_efficiency": 2,
+      "trade_offs": 2,
+      "communication": 2
+    },
+    "readiness_pct": 33,
+    "hire_signal": "NO HIRE"
+  }
+}

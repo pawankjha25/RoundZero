@@ -1,0 +1,51 @@
+name: competency_likelihoods
+version: 1
+owner: pawan
+status: active
+purpose: >
+  The v1 world model: P(polarity | level) for one evidence item, per
+  competency. Expert-set starting values (specs/005 plan.md) - Gate 3 replaces
+  them with values fitted from reviewed labels (roundzero.worldmodel.learn).
+  Level order matches rubrics/competencies/v1.yaml: below_senior, senior,
+  staff, principal. Each level's column must sum to 1 across the three
+  polarities.
+
+polarities: [demonstrated, absent, contradicted]
+
+default:
+  demonstrated: [0.15, 0.40, 0.65, 0.80]
+  absent:       [0.45, 0.40, 0.27, 0.15]
+  contradicted: [0.40, 0.20, 0.08, 0.05]
+
+# Per-competency overrides (same shape as default). Empty in v1.
+overrides: {}
+
+# Prior belief at the start of a round, keyed by the round's target level
+# (RoundAttempt.level). Deliberately wide: the prior leans toward the target,
+# but evidence dominates within a few answers.
+priors:
+  entry_level: [0.40, 0.35, 0.18, 0.07]
+  mid_level:   [0.35, 0.37, 0.20, 0.08]
+  senior:      [0.20, 0.40, 0.30, 0.10]
+  staff:       [0.12, 0.33, 0.38, 0.17]
+  principal:   [0.10, 0.27, 0.36, 0.27]
+  not_sure:    [0.20, 0.35, 0.30, 0.15]
+  default:     [0.15, 0.35, 0.35, 0.15]
+
+update:
+  # Probabilities never drop below this, so a belief can always recover.
+  floor: 0.01
+  # Max total evidence strength applied per competency per answer.
+  per_turn_strength_cap: 1.0
+  # Strength assumed for a direct probe when predicting (picker EIG).
+  predicted_probe_strength: 0.8
+
+diagnosis:
+  # Below this total evidence strength a competency is reported as "not enough
+  # evidence" instead of a level.
+  min_total_strength: 1.0
+  # A drop in expected level (0-3 scale) larger than this marks "where it went wrong".
+  went_wrong_min_drop: 0.15
+  # Causes with a smaller leave-one-out impact are not shown.
+  min_cause_impact: 0.05
+  max_causes: 3

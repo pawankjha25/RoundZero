@@ -1,0 +1,47 @@
+round_type: technical_leadership
+version: 1
+owner: pawan
+status: active
+
+dimensions:
+  - key: technical_vision_strategy
+    label: Technical vision & strategy
+    weight: 0.20
+  - key: mentorship_growth
+    label: Mentorship & growth
+    weight: 0.15
+  - key: conflict_resolution
+    label: Conflict resolution
+    weight: 0.15
+  - key: cross_team_influence
+    label: Cross-team influence
+    weight: 0.15
+  - key: decision_making_ambiguity
+    label: Decision-making under ambiguity
+    weight: 0.20
+  - key: communication
+    label: Communication
+    weight: 0.15
+    note: >
+      Mirrors every other round type's own inclusion of communication as its
+      own scored dimension - see rubrics/ml_system_design/v1.yaml's note.
+
+scale:
+  1: "Below bar - major gaps; needs substantial help."
+  2: "Developing - shows some leadership instinct but misses important considerations."
+  3: "Meets target - independently handles the situation the way a target-level lead would."
+  4: "Exceeds target - anticipates second-order effects, balances competing interests, and shows judgment beyond the immediate ask."
+
+evidence_format: >
+  Every dimension score must be accompanied by a short evidence narrative synthesized
+  from the underlying EvidenceItems (PRD Appendix B), not a bare number. Example:
+  "Conflict resolution - 3/4. Proposed a concrete path to de-escalate the two engineers'
+  disagreement (a time-boxed spike plus a written decision doc) but did not address the
+  underlying trust breakdown when pressed on it."
+
+readiness_computation: >
+  Overall readiness percentage and hire signal (e.g. LEAN HIRE) are deterministic
+  functions of the weighted dimension scores plus level-criticality rules - never
+  generated directly by the model. Same computation as every other round type
+  (roundzero.evaluation.evaluator.compute_readiness) - only the dimensions/weights
+  above are round-type-specific.

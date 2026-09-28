@@ -1,0 +1,24 @@
+role: principal_ml_infra
+level: principal
+
+rounds:
+  - type: coding
+    duration: 50
+
+  - type: ml_system_design
+    duration: 60
+
+  - type: backend_system_design
+    duration: 60
+
+  - type: ml_depth
+    duration: 60
+
+  - type: technical_leadership
+    duration: 50
+
+  - type: xfn
+    duration: 45
+
+  - type: hiring_manager
+    duration: 45

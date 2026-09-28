@@ -1,0 +1,166 @@
+version: 1
+round_type: ml_system_design
+
+scenarios:
+  - id: multi_tenant_inference_platform
+    level: [senior, staff, principal]
+    domain: [ml_infra, general_ml]
+    prompt: >
+      Design a multi-tenant ML inference platform capable of serving thousands of models
+      for different internal teams. Teams have varying traffic patterns, latency
+      requirements, and model sizes (some require GPUs, some run fine on CPU).
+    seed_probes:
+      - "How would you prevent one tenant from monopolizing GPU capacity?"
+      - "Traffic increases 10x during peak hours. Walk me through your autoscaling strategy."
+      - "Your p99 latency suddenly jumps while GPU utilization remains at 40%. How would you investigate?"
+
+  - id: realtime_fraud_detection
+    level: [senior, staff, principal]
+    domain: [ml_infra, general_ml]
+    prompt: >
+      Design a real-time fraud detection system for an online payments platform processing
+      thousands of transactions per second. Each transaction must be scored and a
+      block/allow/review decision returned in under 100ms, using both a live model score and
+      a set of hard business rules.
+    seed_probes:
+      - "Where do the features for the model come from at request time, and how do you keep
+        them consistent with what the model saw during training?"
+      - "The fraud model needs to be updated within hours when a new attack pattern emerges.
+        How does that deployment path differ from a normal weekly retrain?"
+      - "A false positive blocks a legitimate customer's purchase. How would you think about
+        the precision/recall trade-off here, and who should own that threshold?"
+
+  - id: personalized_feed_ranking
+    level: [staff, principal]
+    domain: [general_ml]
+    prompt: >
+      Design the ranking system behind a large social app's personalized home feed. It needs
+      to rank thousands of candidate posts per user request, blend engagement prediction
+      with diversity/freshness objectives, and update rankings within seconds of new user
+      activity.
+    seed_probes:
+      - "Walk me through the funnel from millions of candidate posts down to the final ranked
+        list shown to the user - where does each stage happen and why?"
+      - "How would you detect and correct for feedback loops, where the model's own past
+        rankings bias the training data for future models?"
+      - "Product wants to A/B test three different ranking objectives simultaneously. How does
+        your architecture support that without tripling infrastructure cost?"
+
+  - id: internal_llm_rag_assistant
+    level: [staff, principal]
+    domain: [general_ml, ml_infra]
+    prompt: >
+      Design an internal RAG-based assistant that lets employees ask natural-language
+      questions over the company's internal docs, wikis, and ticket history (millions of
+      documents, updated continuously). It needs to serve thousands of employees with
+      answers grounded in current, permission-scoped content.
+    seed_probes:
+      - "How do you keep the retrieval index fresh as documents are edited or deleted, without
+        re-indexing everything from scratch?"
+      - "A user without access to a confidential doc asks a question whose answer depends on
+        it. How does your design prevent that content from leaking into their answer?"
+      - "How would you evaluate whether the assistant's answers are actually correct, at
+        scale, without hand-reviewing every response?"
+
+  - id: feature_store_platform
+    level: [staff, principal]
+    domain: [ml_infra]
+    prompt: >
+      Design a company-wide feature store used by dozens of ML teams. It must serve
+      low-latency feature lookups online (for real-time inference) and provide
+      point-in-time-correct historical feature values for offline training, from the same
+      underlying feature definitions.
+    seed_probes:
+      - "How do you guarantee training/serving skew doesn't creep in when the same feature is
+        computed by two different code paths (batch vs. streaming)?"
+      - "A team wants a new feature backfilled over two years of history. How does that
+        interact with teams currently reading from the store in production?"
+      - "How would you handle a feature pipeline that silently starts producing null values
+        for 5% of entities?"
+
+  - id: online_experimentation_platform
+    level: [senior, staff, principal]
+    domain: [ml_infra, general_ml]
+    prompt: >
+      Design an online experimentation (A/B testing) platform for evaluating ML model
+      changes - new ranking models, fraud thresholds, recommendation algorithms - against
+      business metrics, used by many teams running concurrent experiments on overlapping
+      user populations.
+    seed_probes:
+      - "Two teams want to run experiments that both touch the same surface at the same time.
+        How does your design prevent their results from contaminating each other?"
+      - "How do you decide an experiment has reached statistical significance, and what do you
+        do about teams that keep peeking at results early and stopping when it looks good?"
+      - "A model change looks like a clear win on the primary metric but a subtle regression
+        shows up two weeks later. What would your platform need to have caught that sooner?"
+
+  - id: production_model_monitoring
+    level: [senior, staff]
+    domain: [ml_infra, general_ml]
+    prompt: >
+      Design a monitoring system for dozens of ML models already in production across the
+      company. It needs to detect data drift, prediction drift, and quality degradation, and
+      trigger the right response (alert an owner, auto-rollback, trigger retraining) before
+      business impact is significant.
+    seed_probes:
+      - "How do you tell the difference between 'the input distribution genuinely shifted' and
+        'there's a bug in the upstream feature pipeline'?"
+      - "A model's offline accuracy looks fine but production quality has quietly degraded for
+        two weeks. What signal would have caught that sooner, given you don't have ground
+        truth labels in real time?"
+      - "Who gets paged when a model's drift score crosses a threshold, and how do you avoid
+        alert fatigue across dozens of models with different owners?"
+
+  - id: search_relevance_ranking
+    level: [staff, principal]
+    domain: [general_ml]
+    prompt: >
+      Design the relevance ranking system for a large e-commerce site's search, covering
+      hundreds of millions of products and needing to return a ranked result set in well
+      under 200ms per query, balancing relevance, business priorities (margin, inventory),
+      and personalization.
+    seed_probes:
+      - "Walk me through how a single query goes from raw text to a ranked list - what
+        happens at each stage, and where does latency budget get spent?"
+      - "How would you incorporate a business signal like 'boost items with excess inventory'
+        without making search results feel obviously manipulated to the user?"
+      - "How do you evaluate ranking quality changes offline before they ever reach a live
+        A/B test?"
+
+  - id: content_moderation_at_scale
+    level: [senior, staff, principal]
+    domain: [general_ml, ml_infra]
+    prompt: >
+      Design a content moderation system that screens user-generated posts, images, and
+      comments for policy violations across a platform with hundreds of millions of daily
+      posts, combining automated ML classification with human review for ambiguous cases.
+    seed_probes:
+      - "How do you route content between fully-automated decisions, human review, and
+        'allow by default'? What determines that split?"
+      - "A new, fast-spreading type of abusive content emerges that the current model doesn't
+        catch. What's your path to responding within hours, not weeks?"
+      - "How would you measure the model's false-negative rate (missed violations) when you
+        don't have ground truth for most of the content that was never flagged?"
+
+  - id: distributed_model_training_platform
+    level: [staff, principal]
+    domain: [ml_infra]
+    prompt: >
+      Design the infrastructure that lets ML teams across the company launch large,
+      multi-day distributed training jobs across shared GPU clusters, with jobs varying
+      widely in size (single-GPU experiments to hundreds-of-GPU runs) and needing to survive
+      hardware failures without losing days of progress.
+    seed_probes:
+      - "A 200-GPU job has been running for 30 hours when one node fails. Walk me through
+        what happens next in your design."
+      - "How do you fairly share a fixed GPU cluster across teams with very different job
+        sizes and priorities, without starving the small, quick experiments?"
+      - "How would you help a team debug why their multi-node job is only getting 60% of
+        expected throughput?"
+
+# 10 scenarios total, spanning both domains (ml_infra / general_ml) and all three
+# levels (senior/staff/principal) - meets the Definition of Done's 10-seed minimum
+# (.claude/skills/add-interview-round, tasks.md item 4). pick_scenario() in
+# src/roundzero/interviewers/ml_system_design/agent.py now does real level+domain
+# filtering with random selection and recent-attempt exclusion, rather than always
+# returning the first level match, now that there's real variety to select from.

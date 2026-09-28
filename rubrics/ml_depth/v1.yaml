@@ -1,0 +1,50 @@
+round_type: ml_depth
+version: 1
+owner: pawan
+status: active
+
+dimensions:
+  - key: conceptual_understanding
+    label: Conceptual understanding
+    weight: 0.20
+  - key: mathematical_reasoning
+    label: Mathematical / derivation reasoning
+    weight: 0.15
+  - key: tradeoffs_intuition
+    label: Trade-offs & intuition
+    weight: 0.15
+  - key: applied_reasoning
+    label: Applied reasoning
+    weight: 0.15
+  - key: debugging_diagnosis
+    label: Debugging / diagnosis
+    weight: 0.15
+  - key: breadth
+    label: Breadth
+    weight: 0.10
+  - key: communication
+    label: Communication
+    weight: 0.10
+    note: >
+      Mirrors ml_system_design's and coding's own inclusion of communication
+      as its own scored dimension - see rubrics/ml_system_design/v1.yaml's note.
+
+scale:
+  1: "Below bar - major gaps; needs substantial help."
+  2: "Developing - understands the area but misses important considerations."
+  3: "Meets target - independently handles expected target-level reasoning."
+  4: "Exceeds target - deep reasoning, anticipates problems, makes sophisticated trade-offs."
+
+evidence_format: >
+  Every dimension score must be accompanied by a short evidence narrative synthesized
+  from the underlying EvidenceItems (PRD Appendix B), not a bare number. Example:
+  "Mathematical reasoning - 3/4. Correctly derived the gradient of cross-entropy loss
+  w.r.t. the softmax logits unprompted, but needed a hint to see why the gradient
+  simplifies to (p - y)."
+
+readiness_computation: >
+  Overall readiness percentage and hire signal (e.g. LEAN HIRE) are deterministic
+  functions of the weighted dimension scores plus level-criticality rules - never
+  generated directly by the model. Same computation as every other round type
+  (roundzero.evaluation.evaluator.compute_readiness) - only the dimensions/weights
+  above are round-type-specific.

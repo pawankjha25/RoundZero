@@ -1,0 +1,99 @@
+version: 1
+round_type: technical_leadership
+
+scenarios:
+  - id: legacy_migration_buyin
+    level: [senior, staff, principal]
+    prompt: >
+      Your team owns a critical service built on a legacy framework that is
+      increasingly hard to hire for and slow to change. You believe a migration to a
+      modern stack is necessary, but it will take a quarter of the team's capacity
+      for two quarters with no visible feature progress. Walk me through how you'd
+      approach this.
+    seed_probes:
+      - "Your VP pushes back and says the roadmap can't slip - what do you do?"
+      - "Halfway through, a senior engineer says the migration is taking twice as
+        long as estimated - how do you handle that conversation?"
+      - "How would you know, in hindsight, whether this was the right call?"
+
+  - id: underperforming_engineer
+    level: [senior, staff, principal]
+    prompt: >
+      A mid-level engineer on your team has been missing deadlines and their code
+      quality has visibly dropped over the last two months. They used to be a solid
+      performer. Walk me through how you'd handle this.
+    seed_probes:
+      - "You find out part of the issue is friction with a teammate, not skill or
+        effort - how does that change your approach?"
+      - "Three weeks later there's no real improvement - what's your next step?"
+      - "How do you balance supporting them with your responsibility to the rest of
+        the team and the work that needs to get done?"
+
+  - id: overconfident_junior
+    level: [senior, staff, principal]
+    prompt: >
+      A promising junior engineer on your team is technically strong but frequently
+      dismisses code review feedback and has started making architectural decisions
+      without checking in, some of which have caused production issues. Walk me
+      through how you'd handle this.
+    seed_probes:
+      - "They push back and say the process is slowing them down unnecessarily - how
+        do you respond?"
+      - "How do you correct this without crushing their confidence or drive?"
+      - "What would make you escalate this beyond a one-on-one conversation?"
+
+  - id: two_seniors_conflict
+    level: [staff, principal]
+    prompt: >
+      Two senior engineers on your team have been publicly disagreeing about a major
+      architectural direction in team meetings, and it's starting to affect team
+      morale and slow down decisions. Walk me through how you'd handle this.
+    seed_probes:
+      - "One of them comes to you privately and says the other is undermining them -
+        how do you handle that?"
+      - "You have your own opinion on the technical question - do you share it, and
+        when?"
+      - "How do you rebuild trust between them once the immediate conflict is
+        resolved?"
+
+  - id: peer_team_wont_cooperate
+    level: [staff, principal]
+    prompt: >
+      Your project depends on an API change from a peer team, but their lead keeps
+      deprioritizing it and you have no formal authority over their roadmap. Your
+      deadline is in three weeks. Walk me through how you'd handle this.
+    seed_probes:
+      - "Their lead says their own team's priorities are just as important - how do
+        you respond?"
+      - "At what point, if any, do you escalate to your managers, and how do you do
+        it without burning the relationship?"
+      - "How would you have avoided this dependency risk in the first place?"
+
+  - id: burned_out_senior
+    level: [staff, principal]
+    prompt: >
+      One of your strongest senior engineers, who has been carrying a disproportionate
+      share of critical on-call and project load, tells you they're burned out and
+      considering leaving. Walk me through how you'd handle this conversation and the
+      weeks after.
+    seed_probes:
+      - "The immediate fix (redistributing load) will slow down a commitment you've
+        already made to leadership - how do you handle that trade-off?"
+      - "How do you prevent this from just happening again to someone else in six
+        months?"
+      - "What do you say if they tell you they've already started interviewing
+        elsewhere?"
+
+  - id: sunsetting_owned_system
+    level: [principal]
+    prompt: >
+      You believe a system your org has invested heavily in over the past two years
+      should be sunset in favor of a different approach, but the team that built it
+      (and their manager, who championed it) will strongly disagree. Walk me through
+      how you'd approach making this case.
+    seed_probes:
+      - "The team's manager says you're just trying to make their work look bad in
+        front of leadership - how do you respond?"
+      - "What evidence would actually change your mind here?"
+      - "How do you handle the morale impact on the team that built the system being
+        sunset, regardless of the outcome?"

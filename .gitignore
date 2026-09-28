@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Misc
+*.log
+.coverage
+htmlcov/
+
+# apps/api local dev database
+apps/api/*.db
+
+# apps/web (Next.js) - has its own .gitignore too, belt and suspenders
+apps/web/.next/
+apps/web/node_modules/
+apps/web/.env*.local
+
+# World-model eval data (specs/005) - derived from candidate transcripts, keep out of git
+evals/world_model/labels/
+evals/world_model/out/
+
+# Local scratch and backups - never commit
+_to_delete/
+apps/api/*.db.bak*
+*.tsbuildinfo

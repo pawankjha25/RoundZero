@@ -1,0 +1,127 @@
+version: 1
+round_type: ml_depth
+
+scenarios:
+  # --- LLM / Gen AI ---
+  - id: transformer_attention_mechanism
+    level: [senior, staff, principal]
+    domain: [llm_genai]
+    prompt: >
+      Explain how self-attention works in a transformer, and why it enables parallelization
+      compared to recurrent architectures.
+    seed_probes:
+      - "Why do we scale the dot product by sqrt(d_k) before the softmax?"
+      - "How does multi-head attention differ from just using one larger attention head?"
+      - "What's the computational complexity of self-attention with respect to sequence
+        length, and why does that matter for long-context models?"
+
+  - id: finetuning_vs_rag
+    level: [staff, principal]
+    domain: [llm_genai]
+    prompt: >
+      A team wants to adapt a general-purpose LLM to answer questions accurately about their
+      internal company knowledge base. Walk me through how you'd decide between fine-tuning,
+      RAG, or some combination.
+    seed_probes:
+      - "What happens to a fine-tuned model's answers when the underlying knowledge base
+        changes daily - how would you handle that?"
+      - "How would you measure whether RAG retrieval is actually the bottleneck versus the
+        generation itself?"
+      - "When would parameter-efficient fine-tuning (e.g. LoRA) change this trade-off?"
+
+  - id: rlhf_alignment
+    level: [staff, principal]
+    domain: [llm_genai]
+    prompt: >
+      Explain how RLHF is used to align a language model's behavior, and what can go wrong
+      with it.
+    seed_probes:
+      - "Walk me through the three stages: SFT, reward modeling, and RL fine-tuning - what
+        does each one actually optimize?"
+      - "What is reward hacking, and how would you detect it happening during training?"
+      - "How does DPO differ from the classic PPO-based RLHF pipeline, and why might a team
+        prefer one over the other?"
+
+  # --- Traditional ML ---
+  - id: bias_variance_regularization
+    level: [senior, staff, principal]
+    domain: [general_ml]
+    prompt: >
+      Explain the bias-variance trade-off, and how L1 vs L2 regularization each affect it
+      differently.
+    seed_probes:
+      - "Why does L1 regularization tend to produce sparse weights while L2 doesn't?"
+      - "Your model has low training error but high validation error - walk me through how
+        you'd diagnose whether it's variance, or something else like data leakage."
+      - "How would cross-validation change your regularization strength choice compared to
+        a single train/val split?"
+
+  - id: tree_ensembles_boosting
+    level: [senior, staff, principal]
+    domain: [general_ml]
+    prompt: >
+      Explain how gradient boosting works, and how it differs fundamentally from random
+      forests.
+    seed_probes:
+      - "Why is gradient boosting more prone to overfitting than random forests, and what
+        controls that?"
+      - "Walk me through what the 'gradient' in gradient boosting actually refers to - what
+        is each new tree fitting to?"
+      - "When would you prefer a well-tuned gradient boosted tree model over a neural
+        network for a tabular dataset?"
+
+  - id: feature_engineering_leakage
+    level: [senior, staff]
+    domain: [general_ml]
+    prompt: >
+      You're building a churn prediction model and validation AUC is unrealistically high
+      (0.98). Walk me through how you'd investigate.
+    seed_probes:
+      - "What's the difference between target leakage and train/test contamination, and how
+        would you check for each?"
+      - "If a feature is only available at prediction time with a delay, how does that
+        change what's safe to use in training?"
+      - "How would you structure your validation split differently for a time-series
+        problem like this?"
+
+  # --- Reinforcement Learning ---
+  - id: policy_vs_value_methods
+    level: [senior, staff, principal]
+    domain: [reinforcement_learning]
+    prompt: >
+      Explain the difference between policy-based and value-based reinforcement learning
+      methods, and when you'd choose one over the other.
+    seed_probes:
+      - "Why can policy gradient methods handle continuous action spaces more naturally
+        than Q-learning?"
+      - "What problem does an actor-critic method solve that pure policy gradient (e.g.
+        REINFORCE) struggles with?"
+      - "How does the exploration-exploitation trade-off manifest differently in each
+        approach?"
+
+  - id: reward_design
+    level: [staff, principal]
+    domain: [reinforcement_learning]
+    prompt: >
+      You're designing the reward function for an agent that should complete a warehouse
+      picking task quickly and safely. Walk me through how you'd approach reward design.
+    seed_probes:
+      - "What is reward shaping, and what's the risk of getting it wrong?"
+      - "The agent starts exploiting a loophole - it repeatedly performs a low-value action
+        that scores well by your reward function without doing the real task. How do you
+        diagnose and fix that?"
+      - "How would you balance a sparse, correct reward signal against a denser but
+        potentially misleading one?"
+
+  - id: rlhf_exploration
+    level: [staff, principal]
+    domain: [reinforcement_learning]
+    prompt: >
+      How does the RL fine-tuning stage of RLHF differ from training a game-playing RL
+      agent from scratch, in terms of exploration and reward signal?
+    seed_probes:
+      - "Why is the KL-divergence penalty against the reference model important in RLHF's
+        RL stage?"
+      - "What happens if you remove that penalty and let the policy diverge freely?"
+      - "How does the reward model's own uncertainty or bias propagate into the final
+        policy?"

@@ -1,0 +1,32 @@
+[project]
+name = "roundzero"
+version = "0.1.0"
+description = "Round Zero - AI-powered full-loop interview simulator"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.40",
+    "google-genai>=1.0",
+    "openai>=1.50",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "email-validator>=2.0",
+    "PyJWT>=2.9",
+    "cryptography>=42",
+    "livekit-agents>=1.0",
+    "livekit-plugins-deepgram>=1.0",
+    "livekit-api>=0.8",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
