@@ -86,3 +86,53 @@ files, and report what changed. Do not commit to git.
 - **DOG-003 (backfill migration) — WRITTEN AND RUN. Confirmed fixed.** `apps/api/migrations/0009_backfill_not_assessed.py` couldn't be executed through this session's device bridge (3 attempts all failed with `sqlite3.OperationalError: disk I/O error` on commit - a bridge file-locking limitation, not a data problem; reads and the live server's own access worked fine throughout). Pawan ran it directly from his own terminal and it worked: backfilled 7 stale evaluations (including `8cf33429-...`, the round originally used to diagnose this) from fabricated `0%/NO HIRE` to correct `not_assessed=1`. Verified live afterward: My Loops now shows no false red badges on any abandoned round, and Progress's "Rounds evaluated" dropped from 9 to the true 3, with "Avg. readiness" correcting from a deflated 9% to the real 28%.
 
 - **DOG-005 (admin route gating) — VERIFIED SECURE, NO FIX NEEDED.** Read `apps/api/routes/admin.py` and `apps/api/deps.py`: every `/v1/admin/*` route already carries `dependencies=[Depends(get_current_admin)]` at the router level, and `get_current_admin` checks the requesting user's email against a real `ADMIN_EMAILS` allowlist, raising 403 otherwise. I could reach `/admin` in this session only because the account in use is legitimately on that allowlist. This was correctly flagged as "needs verification" rather than "confirmed" in the original report — verification came back clean. (Minor, optional nit: the frontend `/admin/page.tsx` has no client-side admin check, so a non-admin user would see a broken page full of failed-request errors rather than a clean "not authorized" message — cosmetic only, not a security gap, and not fixed since it wasn't asked for.)
+
+
+---
+
+## G. Personal Question Bank -> Prep Plans live verification (2026-09-29, later same day)
+Per your call ("that's Prep Plans - just verify/polish it"): Prep Plans is a fully-built feature that was undiscovered in the original audit (no nav entry point was hit in that pass). Live-tested end-to-end against the existing "Staff MLE prep" plan (Staff ML Engineer / ML Infra target):
+
+- **+ Add from bank** - browsed real `scenarios.yaml` entries filtered to the plan's level/domain, added one; correctly excluded from re-listing afterward. Works.
+- **+ Write your own** - added a custom freeform question + notes; correctly labeled "Your own." Correctly **absent** for the Coding area (no way to create a Coding question without runnable starter code/tests - matches the documented design constraint).
+- **Suggest questions** - returns a preview list with individual "Add" buttons below the existing questions; nothing is auto-added. Without an `OPENAI_API_KEY` set, falls back honestly to surfacing real bank scenarios not yet in the area (tagged "From bank" once added) rather than fabricating anything - exactly as designed. Works.
+- **"Start ->" on a question - found broken, fixed.** See DOG-006 below.
+- **Coding-area start** - added the bank scenario "Two Sum" to the Coding area, started it: launched a fully runnable workspace (starter code, constraints, Run code/Reset, real Python execution) - not a broken freeform prompt. Confirms the core design goal (bank-sourced Coding questions always produce a runnable workspace) holds.
+- Both test rounds were ended immediately after confirming launch (to avoid burning Gemini calls unnecessarily); both closed cleanly via the RZ-02/DOG-003 `not_assessed` path.
+
+### DOG-006 - Prep Plan "Start ->" label was dead; only the (unlabeled) question text was clickable (MEDIUM, confirmed + fixed)
+In `apps/web/app/prep-plans/[id]/page.tsx`'s `QuestionRow`, the visible "Start ->" / "Starting..." text was a plain `<span>`, not part of the `<button onClick={onStart}>` - that button only wrapped the question prompt text on the left. Clicking the "Start ->" label (the obvious call-to-action) did **nothing**: no network request, no console error, no navigation - confirmed via the browser's network/console inspectors showing zero activity on click. The round only actually started when clicking the unlabeled prompt text instead - a real, reproducible affordance bug: the thing that looks clickable isn't, and the thing that works doesn't look like a button.
+
+**Fix applied**: turned the `<span>` into its own `<button type="button" onClick={onStart} disabled={starting}>`, calling the same handler already passed to the row. Now both the question text and the "Start ->" label independently start the round. Verified via `tsc --noEmit` (clean) and `eslint` (clean), then live-confirmed twice: clicking "Start ->" directly launched a round with the AI-suggested prompt verbatim as the interviewer's opening line, and again with a bank-sourced Coding scenario producing the correct runnable workspace.
+
+## H. Interruption / recovery testing (live, on a real Coding round)
+Using the same Two Sum round started from Prep Plans:
+- **Page refresh mid-round**: reloaded `/interview/{id}` directly - full transcript, starter code, and countdown timer all resumed correctly. No data loss, no duplicate messages.
+- **Navigate away and back** (to `/prep-plans/...` and back to the interview URL): same clean resume, transcript and timer intact.
+- **Duplicate-submit check**: submitted one candidate answer (a real clarifying-question response), independently hit a transient Chrome-extension disconnect right after - re-checking the transcript afterward showed exactly one candidate turn and one interviewer reply, no duplicate. Submission was not re-sent by the retry.
+- **End Round**: two-step confirm (RZ-07) held again; this round had one real candidate answer so it went through full evaluation rather than `not_assessed` - produced a well-calibrated 53% / LEAN HIRE report that correctly penalized "no code written" despite crediting the correct verbal approach (Correctness 3/4, Approach 3/4, but Code quality 1/4, Debugging 1/4). Confirms the evaluator isn't rubber-stamping verbal answers as full credit.
+
+All interruption/recovery paths tested came back clean - no bugs found here.
+
+## I. Practice-again consistency (brief section 13)
+Already satisfied by the earlier World Model "Retry this answer" test (section A / C above): submitting a stronger answer to the same question produced a real re-score and a distinct "Retry" line on the Interview Path Map next to "Actual," confirmed working end-to-end. Not re-run as a full separate round this pass - same underlying mechanism, no new signal to gain from repeating it.
+
+## J. Interactive debrief Q&A - not available (not a bug)
+Confirmed via full-repo search (`debrief`, `follow-up`, `report.*chat`): no free-form "ask a follow-up question" chat endpoint or UI exists on the report page. The two matches that exist are the internal LLM synthesis module name (`roundzero.debrief.synthesis`) and the unrelated Loop Debrief summary page. The three questions the brief wants answered ("which part of my answer mattered," "what would strengthen it," "give me a practice exercise for that gap") are already answered non-interactively by existing UI instead: per-dimension **View evidence**, the **Improvement Plan** (with priority ranking), and **Practice this** links - plus the already-verified **World Model "Retry this answer"** counterfactual for deeper exploration. Recommend either building the chat feature for real or dropping it from the brief; not filed as a bug.
+
+## K. Updated coverage table
+
+| Area | Status |
+|---|---|
+| Full interview round (setup -> evaluation -> report) | Passed |
+| World Model retry / counterfactual re-score | Passed |
+| `not_assessed` fix (fresh + backfilled) | Passed |
+| Real-interview logging + AI structuring | Passed |
+| Prep Plans: add from bank / write your own / suggest / start | Passed (1 bug found + fixed: DOG-006) |
+| Prep Plans: Coding-area restrictions + runnable workspace | Passed |
+| Interruption/recovery (refresh, nav-away, duplicate-submit) | Passed |
+| Interactive debrief Q&A chat | Not available (feature doesn't exist; closest equivalents work) |
+| Billing/Stripe sandbox | Blocked (no test keys) |
+| Admin route gating | Passed (verified secure, no fix needed) |
+| Gemini rate limiting | Open ops issue (DOG-001) |
+| Personal Question Bank | Satisfied by Prep Plans (see G above) |

@@ -79,7 +79,14 @@ function QuestionRow({
         </p>
       </button>
       <div className="flex shrink-0 flex-col items-end gap-1">
-        <span className="text-xs font-medium text-accent">{starting ? "Starting..." : "Start →"}</span>
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={starting}
+          className="text-xs font-medium text-accent hover:underline disabled:opacity-50"
+        >
+          {starting ? "Starting..." : "Start →"}
+        </button>
         <button type="button" onClick={onDelete} className="text-xs font-medium text-status-strong-concern hover:underline">
           Remove
         </button>
