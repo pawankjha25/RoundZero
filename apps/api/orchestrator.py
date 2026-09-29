@@ -261,18 +261,34 @@ class PlanNotAvailableError(Exception):
 def get_gateway(*, interviewer_turn_count: int = 0) -> LLMGateway:
     """Locked V1 stack: GEMINI_API_KEY present -> GeminiGateway (Gemini 3.6 Flash
     interviewer - see src/roundzero/llm/providers/gemini_provider.py's docstring
-    for the 2.5 -> 3.6 model bump). ANTHROPIC_API_KEY is checked second - AnthropicGateway is kept
-    working but is no longer the default provider now that the stack is locked
-    to Gemini (see the "Lock it" conversation, tasks.md). Otherwise
+    for the 2.5 -> 3.6 model bump). Otherwise ANTHROPIC_API_KEY -> AnthropicGateway
+    (kept working but no longer the default provider now that the stack is
+    locked to Gemini - see the "Lock it" conversation, tasks.md). Otherwise
     MockLLMGateway, fast-forwarded to interviewer_turn_count so a request
     mid-round picks up where the script left off (mock_provider.py's start_turn
     docstring).
 
-    When both keys are present, Gemini is wrapped in FallbackLLMGateway with
-    Anthropic as the fallback (2026-09-01: Gemini returned a transient "503 -
-    high demand" during a live voice round, stalling both the text and voice
-    paths since they share this same call) - a Gemini outage no longer stalls
-    the interview outright, it just quietly retries on Claude for that turn."""
+    Fallback priority when GEMINI_API_KEY is present (2026-09-29, DOG-001 -
+    live dogfooding hit the Gemini interviewer's rate limit routinely, not
+    just during outages, and DOG-007 showed a candidate's answer is lost
+    outright when that call fails with no fallback configured):
+    OPENAI_API_KEY first if set - GPT-5 mini (ROUNDZERO_OPENAI_MODEL) is both
+    cost-conscious (explicit product call: cost matters here) and a model
+    already validated in this codebase, just for evaluation rather than
+    interviewing. Using it as the interviewer's fallback too means a Gemini
+    outage round is graded by the same vendor that asked the question for
+    that one turn - a narrower version of the vendor-separation concern
+    OpenAIGateway's own docstring raises for the *evaluator* pick - accepted
+    here as a deliberate tradeoff since it only applies to the turns Gemini
+    itself failed on, not the round as a whole, and the alternative is losing
+    the candidate's answer entirely (DOG-007). ANTHROPIC_API_KEY remains the
+    fallback when OpenAI isn't configured (2026-09-01: Gemini returned a
+    transient "503 - high demand" during a live voice round, stalling both
+    the text and voice paths since they share this same call) - either way, a
+    Gemini failure no longer stalls the interview outright, it quietly
+    retries on the fallback for that turn."""
+    if os.environ.get("GEMINI_API_KEY") and os.environ.get("OPENAI_API_KEY"):
+        return FallbackLLMGateway(GeminiGateway(), OpenAIGateway())
     if os.environ.get("GEMINI_API_KEY") and os.environ.get("ANTHROPIC_API_KEY"):
         return FallbackLLMGateway(GeminiGateway(), AnthropicGateway())
     if os.environ.get("GEMINI_API_KEY"):
