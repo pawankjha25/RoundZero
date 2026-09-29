@@ -136,3 +136,33 @@ Confirmed via full-repo search (`debrief`, `follow-up`, `report.*chat`): no free
 | Admin route gating | Passed (verified secure, no fix needed) |
 | Gemini rate limiting | Open ops issue (DOG-001) |
 | Personal Question Bank | Satisfied by Prep Plans (see G above) |
+
+
+---
+
+## L. Multi-round loop testing + a critical data-loss bug found and fixed (2026-09-29, same day, continued)
+
+Created a fresh 2-round loop (ML System Design + Coding) to exercise the "complete a full loop" path, which nothing in this pass had touched yet.
+
+### DOG-007 - A candidate's real answer is silently discarded (never saved) if the interviewer's next-turn call fails, and the UI keeps showing it as sent (HIGH, confirmed + fixed)
+
+**Discovered by accident, then reproduced live on a genuine occurrence.** Ending the first loop round (ML System Design) after answering one real clarifying-question response produced an unexpected **"Not assessed - no responses submitted"** result, despite a substantial answer having been typed, sent, and visibly rendered in the transcript panel before ending. A direct (read-only) DB check confirmed the candidate's turn was **never written to `transcript_turns` at all** - only the interviewer's opening line existed server-side.
+
+**Root cause**, traced in `apps/api/orchestrator.py::post_message`: the function calls the interviewer's LLM (`interviewer.next_turn(...)`, i.e. Gemini) *first*, and only builds + persists both the candidate's turn and the interviewer's reply turn together, in one commit, *after* that call succeeds. If the LLM call raises - most commonly a Gemini rate limit, see DOG-001 - the function raises `InterviewerUnavailableError` and **neither turn is ever created**. Meanwhile, `apps/web/components/interview/AIInterviewerPanel.tsx::handleSend` adds the candidate's message to local transcript state *optimistically*, before awaiting the network call, and on a caught error it only set an inline error message - it never rolled back the optimistic bubble. Net effect: the UI shows the candidate's answer as sent and staying in the transcript indefinitely, while the backend silently has nothing. A candidate who doesn't notice a small red error line below the composer (easy to miss - it's not a modal or a toast) and simply ends the round loses that answer completely, and the round can come back "Not assessed" despite genuine engagement.
+
+**Fix applied** (frontend-only, no backend/turn-index semantics touched, to avoid any duplicate-turn risk): in the `catch` block of `handleSend`, the optimistically-added turn is now filtered back out of transcript state and the draft text is restored to the input box, so the UI always reflects backend truth - an answer that failed to save no longer lingers as if it had. `apps/web/components/interview/AIInterviewerPanel.tsx` only.
+
+**Verification**: `tsc --noEmit` and `eslint` both clean. Then, while testing the second loop round (Coding), a **genuine Gemini rate limit hit live** on the first send - directly reproducing the exact failure mode, not simulated: the error banner appeared ("The interviewer's AI backend is temporarily unavailable..."), the draft text was correctly restored to the composer, and no phantom "YOU:" bubble was left in the transcript. Clicking Send again (retry) succeeded cleanly with exactly one candidate turn recorded - no duplicate. This is about as strong a live confirmation as this kind of fix gets.
+
+### Full-loop mechanics - confirmed working
+- Creating a loop with multiple round types (ML System Design + Coding) and starting each independently: correct, "0 of 2" -> "1 of 2" -> "2 of 2 interviews started" tracked accurately.
+- Loop-level aggregate score (47% - LEAN NO HIRE shown on the loop card) correctly reflects only the one *evaluated* round, correctly excluding the not_assessed round from the average - no silent double-counting or zero-inflation.
+- **Loop debrief page** (`/loops/{id}`): for a loop with only 1 of 2 rounds actually evaluated, correctly shows "Committee verdict could not be built yet. This loop needs at least 2 completed interviews before a committee verdict is available" with a Retry link, rather than fabricating a verdict from incomplete data. Clean, honest degradation.
+
+## M. Suggested next Claude Code prompt (DOG-006 + DOG-007 already fixed and pushed - nothing further required, included here only for the record)
+
+Both fixes in this section were implemented and verified during this same session:
+1. DOG-006 - `apps/web/app/prep-plans/[id]/page.tsx`: the "Start ->" label is now its own button wired to the same `onStart` handler as the question text.
+2. DOG-007 - `apps/web/components/interview/AIInterviewerPanel.tsx`: a failed `sendMessage` call now rolls back the optimistic candidate turn and restores the draft, instead of leaving a phantom "sent" bubble that was never persisted.
+
+No further action needed on these two; DOG-001 (the underlying Gemini rate-limit frequency) remains the one open ops recommendation this bug is downstream of.

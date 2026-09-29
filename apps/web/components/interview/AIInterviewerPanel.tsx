@@ -77,7 +77,20 @@ export default function AIInterviewerPanel({
       setRound(resp.round);
       setSecondsLeft(resp.round.time_remaining_sec);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Message failed to send");
+      // DOG-007 (dogfooding QA, 2026-09-29): orchestrator.post_message only
+      // persists the candidate's turn once the interviewer's LLM call
+      // succeeds - if that call fails (a Gemini rate limit, most commonly -
+      // see DOG-001), nothing is saved server-side. Leaving the optimistic
+      // bubble above standing in that case would show an answer as "sent"
+      // that the backend never received, silently costing the candidate
+      // their real answer if they end the round believing it was recorded
+      // (confirmed live: the round was later scored "Not assessed" despite
+      // a real answer having been typed and submitted). Roll the optimistic
+      // turn back and restore the draft so the candidate sees the error and
+      // can retry without retyping.
+      setTranscript((prev) => prev.filter((t) => t !== candidateTurn));
+      setMessageText(text);
+      setError(err instanceof Error ? err.message : "Message failed to send - please try again.");
     } finally {
       setSending(false);
     }
