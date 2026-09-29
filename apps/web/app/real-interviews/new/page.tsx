@@ -7,7 +7,7 @@
 // persists anything). Reachable from the dashboard, a finished loop's card
 // (which pre-fills role/level/domain/loop via query params - never company,
 // which is always typed fresh), or /intel.
-import { useEffect, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppShell from "@/components/AppShell";
@@ -67,7 +67,7 @@ const VISIBILITY_OPTIONS: { value: "private" | "anonymous" | "community"; label:
   },
 ];
 
-export default function NewRealInterviewPage() {
+function NewRealInterviewPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -357,5 +357,13 @@ export default function NewRealInterviewPage() {
         </form>
       </div>
     </AppShell>
+  );
+}
+
+export default function NewRealInterviewPage() {
+  return (
+    <Suspense fallback={null}>
+      <NewRealInterviewPageContent />
+    </Suspense>
   );
 }

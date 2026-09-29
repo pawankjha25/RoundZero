@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import Button from "@/components/ui/Button";
@@ -36,7 +36,7 @@ const ROUND_TYPE_LABELS: Record<string, string> = {
 const ML_DEPTH_DOMAIN_VALUES = new Set(["llm_genai", "general_ml", "reinforcement_learning"]);
 const ALL_SUBAREAS_OPTION = { value: "", label: "All sub-areas" };
 
-export default function SetupPage() {
+function SetupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const roundType = ROUND_TYPE_LABELS[searchParams.get("type") ?? ""] ? (searchParams.get("type") as string) : "ml_system_design";
@@ -200,6 +200,14 @@ export default function SetupPage() {
         </form>
       </div>
     </AppShell>
+  );
+}
+
+export default function SetupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SetupPageContent />
+    </Suspense>
   );
 }
 
