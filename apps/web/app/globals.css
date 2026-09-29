@@ -164,4 +164,20 @@
 body {
   background: var(--background);
   color: var(--foreground);
+  /* User report (2026-09-29): body text reads as "a little dim/not sharp
+     black" despite --foreground already sitting at ~92%-black (oklch 0.19,
+     ~rgb(20,20,20), ~18:1 contrast per the comment above) - the actual gap
+     is font rendering, not the color value. Chrome on macOS/Retina doesn't
+     apply the same subpixel hinting to web fonts that it gives native/
+     system UI text, so a variable font at a normal (400) weight can render
+     visibly thinner and grayer than the same color looks in, say, a native
+     app - a very common "why does my web text look washed out" cause with
+     self-hosted variable fonts specifically. These are the standard,
+     widely-used fixes (Linear/Stripe/Notion-class products all set these):
+     antialiased smoothing on WebKit/macOS Chrome and Safari, grayscale
+     smoothing on Firefox/macOS, and optimizeLegibility so the browser favors
+     letter-spacing/kerning quality over raw render speed. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
