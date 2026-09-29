@@ -53,7 +53,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <Logo className="mb-3 text-foreground" />
+          <Logo size="lg" className="mb-3" />
           <p className="text-sm text-muted-foreground">Sign in to start an interview.</p>
         </div>
 
