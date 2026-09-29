@@ -15,6 +15,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session as DBSession
 
 from apps.api.models import (
@@ -745,29 +746,53 @@ def _title_word(word: str) -> str:
 def _derive_auto_name(
     db: DBSession, user_id: str, role_family: str, level: str, company_profile: str, *, prefix: str
 ) -> str:
-    """Shared "{prefix}-{Company} - {Level Role}-MMDDYY-N" name generator
-    (user request) - used both for a loop auto-created via the original
-    single-round /v1/rounds path (create_round below, prefix="Practice",
-    since /setup never asks for a name at all) and as a pre-filled, still-
-    editable suggestion for the deliberate loop builder's free-text name
-    field (/loops/new, prefix="Loop" - see suggest_loop_name below; that
-    field stays real free text, e.g. "Google-Staff -MLE", this is only a
-    starting point). Trailing MMDDYY-N is a sequence number, not random - the
-    same role/level/company/day combo used to produce byte-identical names
-    (10 indistinguishable "Generic - Senior ML Engineer" rows before this
-    existed at all) - it counts this user's own existing loops with the same
-    name-so-far and takes the next number, a real, deterministic,
-    no-collision counter ("first one like this today" = -1, the next -2,
-    ...) rather than a random guess at uniqueness. Scoped to this user only -
-    two users with the same role/level/company on the same day each start
-    their own -1; scoped separately per prefix - a Practice round and a
-    built loop with the same role/level/company/day count independently."""
+    """Shared "{Level} {Role}[ at Company] {Kind}[ #N]" name generator
+    (user request, reworked 2026-09-29 for a cleaner, non-debug-looking
+    format - see below) - used both for a loop auto-created via the
+    original single-round /v1/rounds path (create_round below,
+    prefix="Practice", since /setup never asks for a name at all), a
+    pre-filled still-editable suggestion for the deliberate loop builder's
+    free-text name field (/loops/new, prefix="Loop" - see suggest_loop_name
+    below; that field stays real free text, e.g. "Google-Staff -MLE", this
+    is only a starting point), a round started from a prep-plan question
+    (prefix="Plan", displayed as "Prep Plan" so it reads as English rather
+    than a raw slug), and a "practice this weakness" drill round
+    (prefix="Drill").
+
+    Originally packed prefix + company + role/level + an MMDDYY date stamp
+    + a mandatory sequence number into one string (e.g.
+    "Plan-Generic - Staff ML Engineer-092926-3") - technically unique and
+    collision-free, but it read like debug/log output, not a name a
+    professional product would show (flagged in a 2026-09-29 look-and-feel
+    pass). Two problems beyond raw appearance: the date was already shown a
+    second time right next to the name everywhere it's rendered (see
+    LoopCard's own created_at line in apps/web/components/loops/
+    LoopList.tsx), and every single loop got a numeric suffix starting at
+    "-1" even the first time that role/level/company combo was ever used,
+    when only a genuine repeat needs to be disambiguated at all.
+
+    New format: "{Level} {Role} {Kind}[ at {Company}]", with a "generic"
+    company_profile (the default/no-specific-company choice) omitted
+    rather than rendered as "at Generic" - same convention
+    ConversationContext.describe_target already uses for the same reason
+    (src/roundzero/domain/interview.py). No date, since the surrounding UI
+    already shows one. A " #N" suffix is appended only from the second
+    occurrence onward (still this user's own count, still scoped
+    separately per prefix/kind, still deterministic and collision-free -
+    just invisible until it's actually disambiguating something, so "first
+    one like this" reads as a normal name instead of always ending in a
+    stray "-1")."""
     label = " ".join(_title_word(w) for w in f"{level}_{role_family}".split("_"))
-    company_label = " ".join(_title_word(w) for w in company_profile.split("_"))
-    date_part = datetime.now(timezone.utc).strftime("%m%d%y")
-    base = f"{prefix}-{company_label} - {label}-{date_part}"
-    existing = db.query(LoopAttempt).filter(LoopAttempt.user_id == user_id, LoopAttempt.name.like(f"{base}-%")).count()
-    return f"{base}-{existing + 1}"
+    kind = "Prep Plan" if prefix == "Plan" else prefix
+    base = f"{label} {kind}"
+    if company_profile and company_profile != "generic":
+        company_label = " ".join(_title_word(w) for w in company_profile.split("_"))
+        base = f"{base} at {company_label}"
+    existing = db.query(LoopAttempt).filter(
+        LoopAttempt.user_id == user_id,
+        or_(LoopAttempt.name == base, LoopAttempt.name.like(f"{base} #%")),
+    ).count()
+    return base if existing == 0 else f"{base} #{existing + 1}"
 
 
 def _derive_loop_name(db: DBSession, user_id: str, role_family: str, level: str, company_profile: str) -> str:
