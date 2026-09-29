@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session as DBSession
 
@@ -20,6 +21,7 @@ from apps.api.models import (
     EvaluationRecord,
     LoopAttempt,
     LoopCommitteeRecord,
+    PAYPERLOOP_PLAN,
     PlannedRound,
     PrepPlan,
     PrepPlanArea,
@@ -29,6 +31,10 @@ from apps.api.models import (
     RoundAttempt,
     RoundWorkspaceState,
     TranscriptTurn,
+    TRIAL_ROUNDS_INCLUDED,
+    TRIAL_WINDOW_DAYS,
+    UNSELECTED_PLAN,
+    UserEntitlement,
     WorkspaceEvent,
 )
 from apps.api import worldmodel_service
@@ -236,6 +242,21 @@ class DrillSourceNotFoundError(Exception):
     between page load and the click, or someone calls the API directly with
     a stale priority."""
 
+class InsufficientQuotaError(Exception):
+    """Raised by _require_quota (called from create_loop, sized to the number
+    of rounds requested, and from _start_round itself, sized to 1 - the two
+    pre-flight enforcement points, see UserEntitlement's docstring in
+    apps/api/models.py) when the caller doesn't have enough rounds left on
+    their current plan, or their free trial has expired. apps/api/routes/
+    rounds.py, loops.py and prep_plans.py all turn this into a 402 Payment
+    Required - not a 400, since the request itself is well-formed, the
+    problem is the account's remaining balance."""
+
+
+class PlanNotAvailableError(Exception):
+    """Raised by select_plan for any plan other than "none" - see its
+    docstring. apps/api/routes/auth.py turns this into a 400."""
+
 
 def get_gateway(*, interviewer_turn_count: int = 0) -> LLMGateway:
     """Locked V1 stack: GEMINI_API_KEY present -> GeminiGateway (Gemini 3.6 Flash
@@ -371,6 +392,187 @@ def _scenario_meta(scenario: dict) -> dict:
     return {k: scenario[k] for k in _SCENARIO_META_KEYS if k in scenario}
 
 
+_UNPROVISIONED_ROUNDS = 1_000_000  # see get_entitlement_status's "entitlement is None" branch
+
+
+@dataclass
+class EntitlementStatus:
+    """Live snapshot of a user's round quota - what both the pre-flight
+    enforcement checks below and GET /v1/auth/me's response are built from.
+    See UserEntitlement's docstring in apps/api/models.py for the underlying
+    row this is computed from."""
+
+    cohort: str
+    plan: str
+    billing_interval: str
+    rounds_included: int
+    rounds_used: int
+    rounds_remaining: int
+    current_period_start: datetime
+    expires_at: datetime | None
+    is_expired: bool
+
+
+def get_entitlement_status(db: DBSession, user_id: str) -> EntitlementStatus:
+    """rounds_used is computed live by counting every RoundAttempt this user
+    has created since current_period_start - including abandoned/incomplete
+    ones. Starting a round is what incurs the LLM cost this whole system
+    exists to meter (see _start_round), not finishing it, so an abandoned
+    round still counts against quota. Never stored redundantly on
+    UserEntitlement itself - same "compute at read time" discipline as
+    real_interview_prediction and PrepPlanQuestion progress."""
+    entitlement = db.query(UserEntitlement).filter(UserEntitlement.user_id == user_id).first()
+    now = _now()
+    if entitlement is None:
+        # In real traffic this never happens - apps/api/deps.py::
+        # get_current_user provisions an entitlement row for every user
+        # before any route handler (and therefore any of this module's
+        # round-starting functions) ever runs. This branch only exists for
+        # callers that reach the orchestrator directly without going through
+        # that dependency - unit tests and one-off scripts using a synthetic
+        # user_id that was never provisioned. Since such a caller was never
+        # meant to be quota-limited in the first place (it isn't a real
+        # signed-up user going through the app), degrade to "effectively
+        # unlimited" rather than blocking it - the opposite failure mode
+        # (a real user silently ungated) can't occur here precisely because
+        # deps.py always provisions first.
+        return EntitlementStatus(
+            cohort="unprovisioned",
+            plan="none",
+            billing_interval="none",
+            rounds_included=_UNPROVISIONED_ROUNDS,
+            rounds_used=0,
+            rounds_remaining=_UNPROVISIONED_ROUNDS,
+            current_period_start=now,
+            expires_at=None,
+            is_expired=False,
+        )
+    rounds_used = (
+        db.query(RoundAttempt)
+        .filter(RoundAttempt.user_id == user_id, RoundAttempt.created_at >= entitlement.current_period_start)
+        .count()
+    )
+    expires_at = entitlement.expires_at
+    if expires_at is not None and expires_at.tzinfo is None:
+        # SQLite (unlike Postgres) hands back naive datetimes regardless of
+        # what was stored - same fixup as time_remaining_sec above.
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    is_expired = expires_at is not None and expires_at <= now
+    return EntitlementStatus(
+        cohort=entitlement.cohort,
+        plan=entitlement.plan,
+        billing_interval=entitlement.billing_interval,
+        rounds_included=entitlement.rounds_included,
+        rounds_used=rounds_used,
+        rounds_remaining=max(0, entitlement.rounds_included - rounds_used),
+        current_period_start=entitlement.current_period_start,
+        expires_at=entitlement.expires_at,
+        is_expired=is_expired,
+    )
+
+
+def _require_quota(db: DBSession, user_id: str, needed: int) -> None:
+    """Pre-flight quota check (design doc: "check upfront, sized to what's
+    being scheduled, not lazily round-by-round"). Two call sites: create_loop
+    below, sized to len(req.rounds) (planning a loop costs nothing itself,
+    but there's no point letting someone plan more rounds than they could
+    ever start), and _start_round itself, sized to 1 - the true point of
+    LLM cost, and the hard backstop even if create_loop's softer check was
+    somehow bypassed (e.g. an old planned round from before a downgrade)."""
+    entitlement_status = get_entitlement_status(db, user_id)
+    if entitlement_status.plan == UNSELECTED_PLAN:
+        # Subscribe gate (UserEntitlement's docstring) - a brand-new
+        # self-signup user has 0 rounds until they explicitly pick a plan.
+        # Distinguished from "expired"/"exhausted" below so the frontend
+        # can send them to Subscribe rather than an upgrade prompt that
+        # implies they once had something to run out of.
+        raise InsufficientQuotaError("Pick a plan to get started - even the free one only takes a click.")
+    if entitlement_status.is_expired:
+        raise InsufficientQuotaError(
+            "Your free trial has ended. Upgrade to a paid plan to keep scheduling interviews."
+        )
+    if entitlement_status.rounds_remaining < needed:
+        if needed > 1:
+            raise InsufficientQuotaError(
+                f"You have {entitlement_status.rounds_remaining} round(s) left - not enough for a "
+                f"full loop of {needed}. Buy more, upgrade, or start an individual round instead."
+            )
+        raise InsufficientQuotaError(
+            "You're out of interview rounds on your current plan. Upgrade to keep practicing."
+        )
+
+
+_SELECTABLE_PLANS = frozenset({"none"})  # only the free plan is implemented - see select_plan's docstring
+
+
+def select_plan(db: DBSession, user_id: str, plan: str) -> EntitlementStatus:
+    """The Subscribe step (UserEntitlement's docstring, "Subscribe gate"
+    paragraph) - POST /v1/auth/subscribe calls this. A brand-new self-signup
+    user's entitlement starts at plan=UNSELECTED_PLAN, 0 rounds
+    (apps/api/deps.py::_ensure_entitlement) - nothing to practice with until
+    they explicitly pick a plan here, on apps/web's /upgrade page. Picking
+    "none" is what actually grants the free trial, and its 7-day window
+    starts now (when it was claimed), not back at signup - a deliberate
+    improvement over measuring the window from signup regardless of whether
+    the person ever came back to claim it.
+
+    Only "none" is implemented - every paid plan needs Stripe (pricing-
+    design.md Phase 2/3, not built yet), so selecting one raises
+    PlanNotAvailableError. The frontend's Subscribe page already shows those
+    cards disabled/"Coming soon"; this is the backend backstop, not the
+    primary UX for that case."""
+    if plan not in _SELECTABLE_PLANS:
+        raise PlanNotAvailableError(f"The '{plan}' plan isn't available yet - check back soon.")
+
+    entitlement = db.query(UserEntitlement).filter(UserEntitlement.user_id == user_id).first()
+    if entitlement is None:
+        # Shouldn't happen - apps/api/deps.py::get_current_user always
+        # provisions one first - but create it here rather than 500ing if
+        # it's somehow missing.
+        entitlement = UserEntitlement(user_id=user_id, cohort="normal")
+        db.add(entitlement)
+
+    now = _now()
+    entitlement.plan = "none"
+    entitlement.rounds_included = TRIAL_ROUNDS_INCLUDED
+    entitlement.current_period_start = now
+    entitlement.expires_at = now + timedelta(days=TRIAL_WINDOW_DAYS)
+    db.commit()
+    return get_entitlement_status(db, user_id)
+
+
+def credit_purchase(db: DBSession, user_id: str, rounds_purchased: int) -> EntitlementStatus:
+    """Called by apps/api/routes/billing.py's webhook handler once a Stripe
+    Pay-per-loop Checkout Session is confirmed paid (checkout.session.
+    completed - see that module's docstring for the idempotency guard around
+    this call). Purchased rounds never expire and aren't tied to a recurring
+    period, unlike the free-trial/subscription rounds this entitlement row
+    otherwise tracks (UserEntitlement's docstring) - so completing a purchase
+    "graduates" the account: rounds_included goes up by what was bought,
+    expires_at is cleared (a still-ticking free-trial deadline shouldn't
+    apply to rounds someone just paid real money for), and cohort flips to
+    "paid". plan only moves to PAYPERLOOP_PLAN when it isn't already
+    something better - a Monthly/Yearly/Founding subscriber (Phase 3, not
+    built yet) buying a top-up pack keeps their subscription's plan name,
+    not "payperloop"."""
+    entitlement = db.query(UserEntitlement).filter(UserEntitlement.user_id == user_id).first()
+    if entitlement is None:
+        # Shouldn't happen (apps/api/deps.py always provisions one first),
+        # but create it here rather than losing a paid purchase to a missing
+        # row.
+        entitlement = UserEntitlement(user_id=user_id, cohort="paid", plan=PAYPERLOOP_PLAN, rounds_included=0)
+        db.add(entitlement)
+        db.flush()
+
+    entitlement.rounds_included = entitlement.rounds_included + rounds_purchased
+    entitlement.cohort = "paid"
+    if entitlement.plan in (UNSELECTED_PLAN, "none"):
+        entitlement.plan = PAYPERLOOP_PLAN
+    entitlement.expires_at = None
+    db.commit()
+    return get_entitlement_status(db, user_id)
+
+
 def _start_round(
     db: DBSession,
     user_id: str,
@@ -412,6 +614,8 @@ def _start_round(
     interviewer's opening turn as focus_hint (see
     interviewers/*/agent.py's next_turn) so it probes that competency
     harder across the whole round - see orchestrator.start_drill_round."""
+    _require_quota(db, user_id, 1)
+
     target_role = TargetRole(
         role_family=role_family,
         level=level,
@@ -636,6 +840,8 @@ def create_loop(db: DBSession, user_id: str, req: LoopCreateRequest) -> LoopAtte
     type was included in the plan. The candidate starts each one separately
     via start_planned_round (only round types in REAL_ROUND_TYPES can actually
     be started)."""
+    _require_quota(db, user_id, len(req.rounds))
+
     loop_attempt = LoopAttempt(user_id=user_id, name=req.name)
     db.add(loop_attempt)
     db.flush()

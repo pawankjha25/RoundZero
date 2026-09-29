@@ -20,7 +20,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from apps.api.db import Base, SessionLocal, engine
-from apps.api.routes import admin, auth, config, feedback, loops, prep_plans, profile, real_interviews, report, rounds, world_model
+from apps.api.routes import admin, auth, billing, config, feedback, loops, prep_plans, profile, real_interviews, report, rounds, world_model
 from apps.api.seed import seed_defaults
 
 Base.metadata.create_all(bind=engine)
@@ -56,6 +56,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(billing.router)
 app.include_router(config.router)
 app.include_router(profile.router)
 app.include_router(rounds.router)

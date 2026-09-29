@@ -48,6 +48,14 @@ class User(Base):
     email = Column(String, nullable=False, index=True)
     name = Column(String, nullable=False)
     created_at = Column(DateTime, default=_now)
+    # Set the first time this user completes a real Stripe Checkout (Phase 2 -
+    # apps/api/routes/billing.py) from the session's `customer` field. Null
+    # for anyone who hasn't paid yet, and not required to create a Checkout
+    # Session in the first place (Stripe creates a Customer implicitly) -
+    # this is purely for Phase 3's future Customer Portal / repeat-purchase
+    # convenience (reusing the same Customer instead of Stripe minting a new
+    # one every time), not something Phase 2 itself depends on.
+    stripe_customer_id = Column(String, nullable=True, index=True)
 
 
 class RoleFamilyOption(Base):
@@ -702,3 +710,101 @@ class WMRetry(Base):
     retry_text = Column(String, nullable=False)
     payload = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=_now)
+
+
+# Free-trial/dogfooder/subscribe-gate sizing (claude.ai Project "roundzero" >
+# pricing-design.md). Centralized here since apps/api/deps.py (auto-
+# provisioning on signup) and apps/api/orchestrator.py (get_entitlement_status,
+# _require_quota, select_plan) all need the same numbers and all already
+# import this module.
+UNSELECTED_PLAN = "unselected"  # sentinel plan value for a self-signup user who hasn't clicked Subscribe yet - see UserEntitlement's docstring, "Subscribe gate" paragraph
+TESTER_ROUNDS_INCLUDED = 8  # 2 loops' worth, no expiry
+TRIAL_ROUNDS_INCLUDED = 1  # a single round, not a full loop - see UserEntitlement's docstring
+TRIAL_WINDOW_DAYS = 7
+PAYPERLOOP_PLAN = "payperloop"  # set on UserEntitlement.plan once someone completes a real Pay-per-loop purchase - see apps/api/routes/billing.py
+
+
+class UserEntitlement(Base):
+    """Round-quota entitlement for a user - the single source of truth for
+    how many interview rounds they're allowed to start and by when (see
+    claude.ai Project "roundzero" > pricing-design.md for the full design).
+    One row per user, auto-created on first sight
+    (apps/api/deps.py::get_current_user, right alongside the User shadow-
+    profile upsert it already does) so every user always has exactly one
+    entitlement row to look up - never a missing-row special case.
+
+    cohort is assigned once, at creation time, from TESTER_EMAILS (mirrors
+    ADMIN_EMAILS's allowlist pattern exactly - apps/api/deps.py) and is not
+    re-derived on later requests even if TESTER_EMAILS changes:
+      - "tester": dogfooding/pilot users, manually allowlisted. 8 rounds
+        (2 loops' worth), no expiry.
+      - "normal": everyone else who just signs up. 1 round, expires 7 days
+        after signup - deliberately a single ROUND, not a full loop, so the
+        free trial doesn't reward signing up with a second email address for
+        an entire extra loop.
+      - "paid": set by an admin's manual grant (Phase 1 - no Stripe wired up
+        yet) once a plan is purchased outside the app; rounds_included and
+        expires_at are set to reflect whatever was granted. Founding
+        Members' "no practical ceiling" is just a very large rounds_included
+        value here, not special-cased code.
+
+    rounds_used is deliberately NOT a column - it's always computed live by
+    counting RoundAttempt rows created since current_period_start, same
+    "compute at read time, never store redundantly" discipline as
+    real_interview_prediction and PrepPlanQuestion progress. See
+    orchestrator.get_entitlement_status.
+
+    expires_at is nullable: null for the tester cohort and for any paid
+    grant with no fixed end. Set for the normal-cohort free trial and for
+    time-boxed paid plans once real subscription billing exists (Phase 3).
+    An already-ACTIVE round is never interrupted by expires_at passing
+    mid-interview - only the pre-flight checks (orchestrator._require_quota,
+    called from create_loop and _start_round) consult expires_at, so a round
+    started before the deadline is grandfathered through to completion.
+
+    Subscribe gate (added 2026-09-29): a brand-new self-signup user (not in
+    TESTER_EMAILS or ADMIN_EMAILS) is provisioned with plan=UNSELECTED_PLAN
+    and rounds_included=0 - nothing to practice with until they explicitly
+    pick a plan (apps/web's /upgrade page -> POST /v1/auth/subscribe ->
+    orchestrator.select_plan). Picking "none" is what actually grants the
+    free trial described above, and the 7-day window starts at that moment,
+    not at signup - so someone who signs up and comes back a week later to
+    finally subscribe still gets the full 7 days. Admin and tester accounts
+    skip this gate entirely (provisioned with a real plan immediately,
+    apps/api/deps.py::_ensure_entitlement) since they're curated accounts,
+    not organic self-signups the product needs to convert."""
+
+    __tablename__ = "user_entitlements"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+
+    cohort = Column(String, nullable=False, default="normal")  # "tester" | "normal" | "paid"
+    plan = Column(String, nullable=False, default="none")  # "none" | "monthly" | "yearly" | "founding" | "payperloop"
+    billing_interval = Column(String, nullable=False, default="none")  # "none" | "monthly" | "yearly" | "one_time"
+
+    rounds_included = Column(Integer, nullable=False, default=1)
+    current_period_start = Column(DateTime, default=_now)
+    expires_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=_now)
+    updated_at = Column(DateTime, default=_now, onupdate=_now)
+
+
+class StripeWebhookEvent(Base):
+    """One row per Stripe webhook event apps/api/routes/billing.py has
+    already processed - Stripe's own delivery guarantee is "at least once,"
+    so the same checkout.session.completed event can arrive more than once
+    (a retry after a slow response, a redelivery from the dashboard, etc.).
+    The webhook handler checks this table by Stripe's own event.id BEFORE
+    crediting any rounds, and inserts a row right after - the same
+    idempotency pattern Stripe's own docs recommend, backed by this row's id
+    being the primary key so a concurrent duplicate delivery collides rather
+    than double-processing (see billing.py's IntegrityError handling, same
+    shape as apps/api/deps.py's user-upsert race)."""
+
+    __tablename__ = "stripe_webhook_events"
+
+    id = Column(String, primary_key=True)  # Stripe's own event id (evt_...), not a generated uuid - that's the whole point
+    event_type = Column(String, nullable=False)
+    processed_at = Column(DateTime, default=_now)

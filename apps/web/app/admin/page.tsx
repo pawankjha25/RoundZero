@@ -22,12 +22,16 @@ import {
   adminListSettings,
   adminUpdateSetting,
   adminListFeedback,
+  adminListUsers,
+  adminUpdateEntitlement,
   type AdminOptionKind,
   type AdminOptionRow,
   type AdminDuration,
   type AdminRoundType,
   type AdminStudyResource,
   type AdminFeedback,
+  type AdminUser,
+  type AdminEntitlementUpdate,
   type User,
 } from "@/lib/api";
 
@@ -570,6 +574,106 @@ const FEEDBACK_KIND_LABEL: Record<AdminFeedback["kind"], string> = {
 // Read-only by design (see apps/api/models.py's Feedback docstring) - for a
 // handful of pilot testers, reading straight through is simpler than
 // building status/triage workflow nobody's asked for yet.
+const COHORT_LABEL: Record<string, string> = {
+  tester: "Tester",
+  normal: "Free trial",
+  paid: "Paid",
+  unprovisioned: "Unprovisioned",
+};
+
+function UsersSection() {
+  const [rows, setRows] = useState<AdminUser[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [addRoundsInput, setAddRoundsInput] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    adminListUsers()
+      .then(setRows)
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load."));
+  }, []);
+
+  async function applyUpdate(userId: string, payload: AdminEntitlementUpdate) {
+    setBusyId(userId);
+    setError(null);
+    try {
+      const updated = await adminUpdateEntitlement(userId, payload);
+      setRows((prev) => (prev ? prev.map((r) => (r.id === userId ? updated : r)) : prev));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Update failed.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <SectionCard title="Users & quota">
+      <p className="mb-3 text-xs text-muted-foreground">
+        Phase 1 - no Stripe yet, so plan/rounds are granted by hand here. Everyone gets a free trial automatically on
+        signup (1 round, 7 days); mark someone a tester for 8 rounds with no expiry, or grant/adjust a paid plan
+        manually once they&apos;ve paid outside the app.
+      </p>
+      {error && <p className="mb-2 text-xs text-status-strong-concern">{error}</p>}
+      {!rows ? (
+        <p className="text-sm text-muted-foreground">Loading...</p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No users yet.</p>
+      ) : (
+        <ul className="space-y-3">
+          {rows.map((r) => (
+            <li key={r.id} className="rounded-md border border-border p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="text-sm font-medium text-foreground">{r.name}</span>{" "}
+                  <span className="text-xs text-muted-foreground">{r.email}</span>
+                </div>
+                <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-foreground">
+                  {COHORT_LABEL[r.cohort] ?? r.cohort}
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {r.plan === "none" ? "No plan" : r.plan} - {r.rounds_used}/{r.rounds_included} rounds used this period
+                {r.expires_at && ` - expires ${new Date(r.expires_at).toLocaleDateString()}`}
+                {r.is_expired && " (expired)"}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <SmallButton
+                  onClick={() => applyUpdate(r.id, { cohort: "tester", rounds_included: 8, clear_expiry: true })}
+                  disabled={busyId === r.id}
+                >
+                  Make tester (8, no expiry)
+                </SmallButton>
+                <SmallButton onClick={() => applyUpdate(r.id, { clear_expiry: true })} disabled={busyId === r.id}>
+                  Clear expiry
+                </SmallButton>
+                <input
+                  type="number"
+                  className="w-20 rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground"
+                  placeholder="+rounds"
+                  value={addRoundsInput[r.id] ?? ""}
+                  onChange={(e) => setAddRoundsInput((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                />
+                <SmallButton
+                  onClick={() => {
+                    const n = Number(addRoundsInput[r.id]);
+                    if (!Number.isFinite(n) || n === 0) return;
+                    applyUpdate(r.id, { add_rounds: n }).then(() =>
+                      setAddRoundsInput((prev) => ({ ...prev, [r.id]: "" }))
+                    );
+                  }}
+                  disabled={busyId === r.id}
+                >
+                  Add rounds
+                </SmallButton>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </SectionCard>
+  );
+}
+
 function FeedbackSection() {
   const [rows, setRows] = useState<AdminFeedback[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -654,6 +758,7 @@ export default function AdminPage() {
           <RoundTypesEditor />
           <StudyResourcesEditor />
           <SettingsEditor />
+          <UsersSection />
           <FeedbackSection />
         </div>
       </div>

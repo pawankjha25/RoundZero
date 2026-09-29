@@ -28,6 +28,7 @@ or removing an admin is a redeploy-free env var change.
 from __future__ import annotations
 
 import os
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
 import jwt
@@ -37,7 +38,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DBSession
 
 from apps.api.db import get_db
-from apps.api.models import User
+from apps.api.models import (
+    TESTER_ROUNDS_INCLUDED,
+    TRIAL_ROUNDS_INCLUDED,
+    TRIAL_WINDOW_DAYS,
+    UNSELECTED_PLAN,
+    User,
+    UserEntitlement,
+)
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -65,6 +73,81 @@ def _decode(token: str) -> dict:
         )
     except jwt.PyJWTError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired session") from exc
+
+
+def _tester_emails() -> set[str]:
+    raw = os.environ.get("TESTER_EMAILS", "")
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
+def is_tester_email(email: str) -> bool:
+    """Dogfooding/pilot-user allowlist, same shape as is_admin_email below
+    (comma-separated TESTER_EMAILS env var, case-insensitive) - config, not a
+    DB column, so inviting a new tester is a redeploy-free env var change."""
+    return bool(email) and email.lower() in _tester_emails()
+
+
+def _ensure_entitlement(db: DBSession, user: User) -> None:
+    """Auto-grant a UserEntitlement row the first time we ever see this user
+    - called from get_current_user for every request, but a no-op once the
+    row exists (cheap indexed lookup, and this only ever runs at creation -
+    an existing row, however it got its plan, is never touched again here).
+    This also backfills any user created before this feature shipped, the
+    first time they make any authenticated request after deploy - no
+    migration/backfill script needed. cohort/plan are decided once, here,
+    from TESTER_EMAILS/ADMIN_EMAILS at creation time; never re-derived later
+    even if those env vars change afterward.
+
+    Three paths (see UserEntitlement's docstring, "Subscribe gate" paragraph,
+    for the reasoning):
+      - Tester allowlist -> the full 8-round dogfooder grant, immediately.
+      - Admin allowlist -> the normal free-trial grant, immediately - admins
+        are Pawan's own curated accounts, not organic signups, so they skip
+        the Subscribe gate below.
+      - Everyone else (a real self-signup) -> UNSELECTED_PLAN, 0 rounds.
+        Nothing to practice with until they explicitly pick a plan via
+        POST /v1/auth/subscribe (orchestrator.select_plan) - see apps/web's
+        /upgrade page."""
+    existing = db.query(UserEntitlement).filter(UserEntitlement.user_id == user.id).first()
+    if existing is not None:
+        return
+    now = datetime.now(timezone.utc)
+    if is_tester_email(user.email):
+        entitlement = UserEntitlement(
+            user_id=user.id,
+            cohort="tester",
+            plan="none",
+            rounds_included=TESTER_ROUNDS_INCLUDED,
+            current_period_start=now,
+            expires_at=None,
+        )
+    elif is_admin_email(user.email):
+        entitlement = UserEntitlement(
+            user_id=user.id,
+            cohort="normal",
+            plan="none",
+            rounds_included=TRIAL_ROUNDS_INCLUDED,
+            current_period_start=now,
+            expires_at=now + timedelta(days=TRIAL_WINDOW_DAYS),
+        )
+    else:
+        entitlement = UserEntitlement(
+            user_id=user.id,
+            cohort="normal",
+            plan=UNSELECTED_PLAN,
+            rounds_included=0,
+            current_period_start=now,
+            expires_at=None,
+        )
+    db.add(entitlement)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Concurrent first-time requests for the same brand-new user (same
+        # React Strict Mode double-invoke this guards against for the User
+        # row itself, right below) - the loser just rolls back, a row now
+        # exists either way.
+        db.rollback()
 
 
 def get_current_user(
@@ -106,6 +189,7 @@ def get_current_user(
         user.name = name or user.name
         db.commit()
         db.refresh(user)
+    _ensure_entitlement(db, user)
     return user
 
 

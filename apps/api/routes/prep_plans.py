@@ -282,6 +282,8 @@ def start_round_from_question(
     so the frontend enters the normal interview room unchanged."""
     try:
         round_, first_turn = orchestrator.start_round_from_plan_question(db, user.id, question_id)
+    except orchestrator.InsufficientQuotaError as exc:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc)) from exc
     except orchestrator.PlanQuestionNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except orchestrator.InterviewerUnavailableError as exc:

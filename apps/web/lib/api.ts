@@ -9,11 +9,29 @@ import { createClient } from "@/lib/supabase/client";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+// Mirrors apps/api/models.py::UserEntitlement + orchestrator.EntitlementStatus
+// - the live round-quota snapshot bundled onto every /v1/auth/me response so
+// the quota pill (components/AppShell.tsx) never needs its own network call.
+export interface Entitlement {
+  cohort: "tester" | "normal" | "paid" | "unprovisioned";
+  // "unselected" - a real self-signup account that hasn't clicked Subscribe
+  // yet (see /upgrade's SubscribePage below). Admin/tester accounts skip
+  // this and start at "none" (the free plan) immediately.
+  plan: "unselected" | "none" | "monthly" | "yearly" | "founding" | "payperloop" | string;
+  rounds_included: number;
+  rounds_used: number;
+  rounds_remaining: number;
+  current_period_start: string;
+  expires_at: string | null;
+  is_expired: boolean;
+}
+
 export interface User {
   id: string;
   email: string;
   name: string;
   is_admin: boolean;
+  entitlement: Entitlement;
 }
 
 async function getAccessToken(): Promise<string | null> {
@@ -57,6 +75,39 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function me(): Promise<User> {
   return apiFetch<User>("/v1/auth/me");
+}
+
+// The Subscribe step (apps/web/app/upgrade/page.tsx) - only "none" (the free
+// plan) actually does anything server-side right now; every subscription
+// plan (Monthly/Yearly/Founding - Phase 3) still throws "not available yet"
+// (mirrors orchestrator.select_plan and apps/api/routes/auth.py::subscribe).
+// Pay-per-loop is a separate flow now - see createCheckoutSession below.
+export function subscribe(plan: string): Promise<Entitlement> {
+  return apiFetch<Entitlement>("/v1/auth/subscribe", {
+    method: "POST",
+    body: JSON.stringify({ plan }),
+  });
+}
+
+// --- Billing (Stripe, Phase 2: Pay-per-loop only) ---
+// Mirrors apps/api/routes/billing.py::PAYPERLOOP_PACKS - keep these two in
+// sync if the backend's pack table ever changes.
+export type PayPerLoopPack = "pack_4" | "pack_12";
+
+export interface CheckoutSession {
+  checkout_url: string;
+}
+
+// Creates a Stripe Checkout Session for a one-time round pack and returns
+// its URL - the caller (app/upgrade/page.tsx) does a full browser redirect
+// to it (window.location.href), not a fetch/navigation within the app,
+// since Checkout is Stripe-hosted. Throws with "Payments aren't set up
+// yet..." if STRIPE_SECRET_KEY isn't configured on the backend (501).
+export function createCheckoutSession(pack: PayPerLoopPack): Promise<CheckoutSession> {
+  return apiFetch<CheckoutSession>("/v1/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify({ pack }),
+  });
 }
 
 export async function logout(): Promise<{ ok: boolean }> {
@@ -1173,4 +1224,46 @@ export function createRetry(roundId: string, turnIndex: number, text: string): P
 
 export function getCompetencyTrend(): Promise<CompetencyTrendPoint[]> {
   return apiFetch<CompetencyTrendPoint[]>("/v1/report/competency-trend");
+}
+
+// --- Admin: Users / entitlements (Phase 1 of the pricing rollout - no
+// Stripe yet, an admin grants/adjusts quota by hand. Mirrors
+// apps/api/routes/admin.py::UserAdminOut/EntitlementUpdateIn. ---
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  created_at: string;
+  cohort: string;
+  plan: string;
+  billing_interval: string;
+  rounds_included: number;
+  rounds_used: number;
+  rounds_remaining: number;
+  current_period_start: string;
+  expires_at: string | null;
+  is_expired: boolean;
+}
+
+export interface AdminEntitlementUpdate {
+  cohort?: string;
+  plan?: string;
+  billing_interval?: string;
+  rounds_included?: number;
+  add_rounds?: number;
+  reset_period?: boolean;
+  clear_expiry?: boolean;
+  expires_at?: string;
+}
+
+export function adminListUsers(): Promise<AdminUser[]> {
+  return apiFetch<AdminUser[]>("/v1/admin/users");
+}
+
+export function adminUpdateEntitlement(userId: string, payload: AdminEntitlementUpdate): Promise<AdminUser> {
+  return apiFetch<AdminUser>(`/v1/admin/users/${userId}/entitlement`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }

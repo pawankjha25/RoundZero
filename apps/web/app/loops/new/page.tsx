@@ -39,7 +39,14 @@ export default function NewLoopPage() {
 
   useEffect(() => {
     me()
-      .then(setUser)
+      .then((u) => {
+        setUser(u);
+        // Subscribe gate (pricing-design.md, 2026-09-29) - see setup/page.tsx's
+        // identical check for the full reasoning.
+        if (u.entitlement.plan === "unselected") {
+          router.push("/upgrade");
+        }
+      })
       .catch(() => router.push("/login"));
     getOptions().then((opts) => {
       setOptions(opts);

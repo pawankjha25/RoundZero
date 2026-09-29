@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import QuotaPill from "@/components/QuotaPill";
 import ThemeToggle from "@/components/ThemeToggle";
 import { logout, type User } from "@/lib/api";
 
@@ -86,6 +87,7 @@ export default function AppShell({ user, active, children }: AppShellProps) {
             </nav>
           </div>
           <div className="flex items-center gap-4">
+            {user && <QuotaPill user={user} />}
             <Link
               href="/profile"
               className={

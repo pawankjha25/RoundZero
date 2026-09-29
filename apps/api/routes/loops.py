@@ -76,7 +76,10 @@ def create_loop(
 ) -> LoopOut:
     if not payload.rounds:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Pick at least one round for this loop.")
-    loop = orchestrator.create_loop(db, user.id, payload)
+    try:
+        loop = orchestrator.create_loop(db, user.id, payload)
+    except orchestrator.InsufficientQuotaError as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc)) from exc
     return _loop_out(db, loop)
 
 
@@ -131,6 +134,8 @@ def start_planned_round(
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except orchestrator.RoundTypeNotAvailableError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except orchestrator.InsufficientQuotaError as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc)) from exc
     except orchestrator.InterviewerUnavailableError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 

@@ -117,6 +117,8 @@ def start_round(
         round_, first_turn = orchestrator.create_round(db, user.id, payload)
     except orchestrator.RoundTypeNotAvailableError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except orchestrator.InsufficientQuotaError as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc)) from exc
     except orchestrator.InterviewerUnavailableError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     return RoundDetailOut(round=_round_out(round_), transcript=[_turn_out(first_turn)])
@@ -234,6 +236,8 @@ def start_drill(
         round_, first_turn = orchestrator.start_drill_round(db, user.id, source_round, payload.priority)
     except orchestrator.DrillSourceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except orchestrator.InsufficientQuotaError as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc)) from exc
     except orchestrator.InterviewerUnavailableError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     return RoundDetailOut(round=_round_out(round_), transcript=[_turn_out(first_turn)])

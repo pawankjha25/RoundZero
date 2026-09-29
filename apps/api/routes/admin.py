@@ -16,12 +16,13 @@ read back by apps/api/routes/report.py).
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
+from apps.api import orchestrator
 from apps.api.db import get_db
 from apps.api.deps import get_current_admin
 from apps.api.models import (
@@ -35,6 +36,7 @@ from apps.api.models import (
     RoundTypeOption,
     StudyResource,
     User,
+    UserEntitlement,
 )
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"], dependencies=[Depends(get_current_admin)])
@@ -384,3 +386,110 @@ def list_feedback(db: DBSession = Depends(get_db)) -> list[FeedbackAdminOut]:
         )
         for f, u in rows
     ]
+
+
+
+# --- Users (entitlement/quota administration - Phase 1 of the pricing
+# rollout, claude.ai Project "roundzero" > pricing-design.md: no Stripe yet,
+# an admin grants/adjusts entitlements by hand. Every user always has exactly
+# one UserEntitlement row (auto-created on first sight - apps/api/deps.py::
+# get_current_user), so this is a straightforward list + patch, same shape as
+# the option-list CRUD above. ---
+
+
+class UserAdminOut(BaseModel):
+    id: str
+    email: str
+    name: str
+    created_at: datetime
+    cohort: str
+    plan: str
+    billing_interval: str
+    rounds_included: int
+    rounds_used: int
+    rounds_remaining: int
+    current_period_start: datetime
+    expires_at: datetime | None
+    is_expired: bool
+
+
+class EntitlementUpdateIn(BaseModel):
+    # Every field optional and independently applied - an admin call only
+    # ever touches what it explicitly sets, same "only apply what's not
+    # None" convention as OptionRowUpdate/StudyResourceUpdate above.
+    cohort: str | None = None  # "tester" | "normal" | "paid"
+    plan: str | None = None  # "none" | "monthly" | "yearly" | "founding" | "payperloop"
+    billing_interval: str | None = None  # "none" | "monthly" | "yearly" | "one_time"
+    rounds_included: int | None = None  # absolute set
+    add_rounds: int | None = None  # increment rounds_included by this many instead of setting it outright
+    reset_period: bool = False  # also bump current_period_start to now, so rounds_used starts counting fresh
+    clear_expiry: bool = False  # explicit flag, since expires_at=null in the body is ambiguous with "not sent"
+    expires_at: datetime | None = None  # only applied when clear_expiry is False
+
+
+def _get_or_create_entitlement(db: DBSession, user_id: str) -> UserEntitlement:
+    row = db.query(UserEntitlement).filter(UserEntitlement.user_id == user_id).first()
+    if row is None:
+        # Backfill path for a user created before this feature shipped who
+        # hasn't made an authenticated request since (apps/api/deps.py::
+        # get_current_user would otherwise be what creates this row) - an
+        # admin shouldn't have to wait for that to grant them something.
+        row = UserEntitlement(user_id=user_id, cohort="normal", plan="none", rounds_included=1)
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+    return row
+
+
+def _user_admin_out(db: DBSession, user: User) -> UserAdminOut:
+    status_ = orchestrator.get_entitlement_status(db, user.id)
+    return UserAdminOut(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        created_at=user.created_at,
+        cohort=status_.cohort,
+        plan=status_.plan,
+        billing_interval=status_.billing_interval,
+        rounds_included=status_.rounds_included,
+        rounds_used=status_.rounds_used,
+        rounds_remaining=status_.rounds_remaining,
+        current_period_start=status_.current_period_start,
+        expires_at=status_.expires_at,
+        is_expired=status_.is_expired,
+    )
+
+
+@router.get("/users", response_model=list[UserAdminOut])
+def list_users(db: DBSession = Depends(get_db)) -> list[UserAdminOut]:
+    users = db.query(User).order_by(User.created_at.desc()).all()
+    return [_user_admin_out(db, u) for u in users]
+
+
+@router.patch("/users/{user_id}/entitlement", response_model=UserAdminOut)
+def update_user_entitlement(user_id: str, payload: EntitlementUpdateIn, db: DBSession = Depends(get_db)) -> UserAdminOut:
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="User not found")
+    entitlement = _get_or_create_entitlement(db, user_id)
+
+    if payload.cohort is not None:
+        entitlement.cohort = payload.cohort
+    if payload.plan is not None:
+        entitlement.plan = payload.plan
+    if payload.billing_interval is not None:
+        entitlement.billing_interval = payload.billing_interval
+    if payload.rounds_included is not None:
+        entitlement.rounds_included = payload.rounds_included
+    if payload.add_rounds is not None:
+        entitlement.rounds_included = entitlement.rounds_included + payload.add_rounds
+    if payload.reset_period:
+        entitlement.current_period_start = datetime.now(timezone.utc)
+    if payload.clear_expiry:
+        entitlement.expires_at = None
+    elif payload.expires_at is not None:
+        entitlement.expires_at = payload.expires_at
+
+    db.commit()
+    db.refresh(user)
+    return _user_admin_out(db, user)

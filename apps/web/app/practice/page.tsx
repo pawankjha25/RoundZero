@@ -26,7 +26,16 @@ export default function PracticePage() {
 
   useEffect(() => {
     me()
-      .then(setUser)
+      .then((u) => {
+        setUser(u);
+        // Subscribe gate (pricing-design.md, 2026-09-29) - Practice is the
+        // hub every round-starting path is reached from, so this is the
+        // earliest, friendliest place to redirect someone who hasn't picked
+        // a plan yet (before they even pick a round type).
+        if (u.entitlement.plan === "unselected") {
+          router.push("/upgrade");
+        }
+      })
       .catch(() => router.push("/login"));
   }, [router]);
 

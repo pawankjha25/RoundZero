@@ -55,7 +55,17 @@ function SetupPageContent() {
 
   useEffect(() => {
     me()
-      .then(setUser)
+      .then((u) => {
+        setUser(u);
+        // Subscribe gate (pricing-design.md, 2026-09-29) - a real self-signup
+        // account hasn't picked a plan yet, so there's nothing to practice
+        // with (apps/api/deps.py::_ensure_entitlement gives it 0 rounds).
+        // Send them to Subscribe before they fill out this whole form only
+        // to hit a 402 on submit.
+        if (u.entitlement.plan === "unselected") {
+          router.push("/upgrade");
+        }
+      })
       .catch(() => router.push("/login"));
     getOptions().then((opts) => {
       setOptions(opts);
