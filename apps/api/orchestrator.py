@@ -437,7 +437,25 @@ def get_entitlement_status(db: DBSession, user_id: str) -> EntitlementStatus:
     exists to meter (see _start_round), not finishing it, so an abandoned
     round still counts against quota. Never stored redundantly on
     UserEntitlement itself - same "compute at read time" discipline as
-    real_interview_prediction and PrepPlanQuestion progress."""
+    real_interview_prediction and PrepPlanQuestion progress.
+
+    DOG-004 (user decision, 2026-09-29, ahead of inviting the first real
+    testers): a round that reaches EvaluationRecord.not_assessed=True never
+    actually recorded an interview - the candidate never got a real answer
+    saved, whether because they abandoned immediately or (DOG-007) an
+    interviewer LLM call failed and silently dropped what they typed. Either
+    way there's no interview to show for it, so it's excluded from
+    rounds_used below - refunded the moment submit_round evaluates it as
+    not_assessed, not before (a round still ACTIVE/in progress keeps
+    counting, same as always, since it may yet become a real interview and
+    has likely already incurred at least the opening LLM turn's cost).
+    Deliberately not narrower than that (e.g. only refunding the specific
+    "LLM call failed" case) - distinguishing "candidate never answered" from
+    "an answer was lost to a failure" isn't something the data model
+    captures today, and at this stage (a handful of invited testers, not
+    open signup) the abuse surface of a free retry on a truly empty round
+    is negligible next to the cost of a tester losing quota to a bug that
+    isn't their fault."""
     entitlement = db.query(UserEntitlement).filter(UserEntitlement.user_id == user_id).first()
     now = _now()
     if entitlement is None:
@@ -464,9 +482,14 @@ def get_entitlement_status(db: DBSession, user_id: str) -> EntitlementStatus:
             expires_at=None,
             is_expired=False,
         )
+    not_assessed_round_ids = db.query(EvaluationRecord.round_id).filter(EvaluationRecord.not_assessed.is_(True))
     rounds_used = (
         db.query(RoundAttempt)
-        .filter(RoundAttempt.user_id == user_id, RoundAttempt.created_at >= entitlement.current_period_start)
+        .filter(
+            RoundAttempt.user_id == user_id,
+            RoundAttempt.created_at >= entitlement.current_period_start,
+            RoundAttempt.id.notin_(not_assessed_round_ids),
+        )
         .count()
     )
     expires_at = entitlement.expires_at

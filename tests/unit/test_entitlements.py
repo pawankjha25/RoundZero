@@ -89,6 +89,42 @@ def test_rounds_used_counts_rounds_created_since_current_period_start():
         db.close()
 
 
+def test_not_assessed_rounds_are_refunded_and_dont_count_against_quota():
+    """DOG-004 (user decision, 2026-09-29, ahead of inviting the first real
+    testers): a round that never recorded a real answer - abandoned, or lost
+    to an interviewer LLM failure (DOG-007) - shouldn't cost the candidate a
+    round of their limited quota. Submitting with zero candidate turns is
+    exactly what flips EvaluationRecord.not_assessed to True (see
+    submit_round), which get_entitlement_status's rounds_used now excludes."""
+    db = SessionLocal()
+    try:
+        user_id = "ent-user-not-assessed"
+        _grant(db, user_id, rounds_included=3)
+
+        round_, _turn = orchestrator.create_round(db, user_id, _START_REQ)
+        assert orchestrator.get_entitlement_status(db, user_id).rounds_used == 1
+
+        evaluation = orchestrator.submit_round(db, round_)
+        assert evaluation.not_assessed is True
+
+        status_ = orchestrator.get_entitlement_status(db, user_id)
+        assert status_.rounds_used == 0
+        assert status_.rounds_remaining == 3
+
+        # A round that DOES get a real answer still counts normally - the
+        # refund is specific to not_assessed, not evaluation in general.
+        round2, _turn2 = orchestrator.create_round(db, user_id, _START_REQ)
+        orchestrator.post_message(db, round2, "A real candidate answer.")
+        evaluation2 = orchestrator.submit_round(db, round2)
+        assert evaluation2.not_assessed is False
+
+        status_2 = orchestrator.get_entitlement_status(db, user_id)
+        assert status_2.rounds_used == 1
+        assert status_2.rounds_remaining == 2
+    finally:
+        db.close()
+
+
 def test_starting_a_round_is_blocked_once_quota_is_exhausted():
     db = SessionLocal()
     try:
