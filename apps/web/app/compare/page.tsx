@@ -4,8 +4,22 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppShell from "@/components/AppShell";
-import { compareRounds, me, type RoundComparison, type User } from "@/lib/api";
+import { compareRounds, me, type HistoryItem, type RoundComparison, type User } from "@/lib/api";
 import { formatLabel } from "@/lib/format";
+import { ROUND_TYPES } from "@/lib/roundTypes";
+
+const ROUND_TYPE_LABELS = new Map(ROUND_TYPES.map((rt) => [rt.key, rt.label]));
+
+// RZ-10 (UI/UX review, 2026-09-29): the old heading built its "X vs Y" line
+// entirely from round_older's own level/role_family, so comparing two rounds
+// with different targets (or different round types) silently hid that
+// mismatch - "Staff ML Engineer - 9/26 vs. 9/29" even when 9/29 was an Entry
+// Level Coding round. Each side now states its own identity.
+function roundIdentity(round: HistoryItem): string {
+  const typeLabel =
+    ROUND_TYPE_LABELS.get(round.round_type as (typeof ROUND_TYPES)[number]["key"]) ?? formatLabel(round.round_type);
+  return `${typeLabel} - ${formatLabel(round.level)} ${formatLabel(round.role_family)}`;
+}
 
 function deltaBadge(delta: number, suffix = "") {
   if (delta === 0) {
@@ -37,9 +51,16 @@ function ComparePageContent() {
       .catch(() => router.push("/login"));
   }, [router]);
 
+  // Missing query params isn't something that happens after a render - it's
+  // knowable from the params themselves, so it's derived here instead of
+  // being pushed into state from inside the effect below (which used to
+  // call setError synchronously on the very first effect run for this case -
+  // a react-hooks/set-state-in-effect violation, and functionally a diff
+  // update squeezed into an extra render for no reason).
+  const missingParamsMessage = !roundIdA || !roundIdB ? "Pick two rounds from your dashboard to compare." : null;
+
   useEffect(() => {
     if (!roundIdA || !roundIdB) {
-      setError("Pick two rounds from your dashboard to compare.");
       return;
     }
     let cancelled = false;
@@ -55,11 +76,12 @@ function ComparePageContent() {
     };
   }, [roundIdA, roundIdB]);
 
-  if (error) {
+  const displayError = error ?? missingParamsMessage;
+  if (displayError) {
     return (
       <AppShell user={user} active="loops">
         <div className="mx-auto max-w-2xl">
-          <p className="text-sm text-status-strong-concern">{error}</p>
+          <p className="text-sm text-status-strong-concern">{displayError}</p>
           <Link href="/dashboard" className="mt-4 inline-block text-sm text-muted-foreground underline">
             Back to dashboard
           </Link>
@@ -86,10 +108,15 @@ function ComparePageContent() {
         <div>
           <h1 className="text-xl font-semibold text-foreground">Compare rounds</h1>
           <p className="mt-1 text-base text-muted-foreground">
-            {formatLabel(round_older.level)} {formatLabel(round_older.role_family)} -{" "}
             {new Date(round_older.created_at).toLocaleDateString()} vs.{" "}
             {new Date(round_newer.created_at).toLocaleDateString()}
           </p>
+          {(round_older.round_type !== round_newer.round_type || round_older.level !== round_newer.level) && (
+            <p className="mt-2 rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              These two rounds aren&apos;t directly comparable - {roundIdentity(round_older)} vs. {roundIdentity(round_newer)}.
+              A readiness change here may reflect the different round type or level, not just performance.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -97,6 +124,7 @@ function ComparePageContent() {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Earlier - {new Date(round_older.created_at).toLocaleDateString()}
             </p>
+            <p className="mt-1 text-sm font-medium text-foreground">{roundIdentity(round_older)}</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">{evaluation_older.readiness_pct}%</p>
             <p className="mt-1 text-sm text-muted-foreground">{comparison.hire_signal_older}</p>
           </div>
@@ -104,6 +132,7 @@ function ComparePageContent() {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Later - {new Date(round_newer.created_at).toLocaleDateString()}
             </p>
+            <p className="mt-1 text-sm font-medium text-foreground">{roundIdentity(round_newer)}</p>
             <p className="mt-2 text-2xl font-semibold text-foreground">
               {evaluation_newer.readiness_pct}% <span className="ml-2 text-base">{deltaBadge(comparison.readiness_delta, "pp")}</span>
             </p>

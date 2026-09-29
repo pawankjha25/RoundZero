@@ -1,12 +1,12 @@
 "use client";
 
-import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useId, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import Button from "@/components/ui/Button";
 import Link from "next/link";
 import RoundTypeIcon, { type RoundTypeKey } from "@/components/RoundTypeIcon";
-import { getOptions, me, startRound, type Options, type RoundModality, type User } from "@/lib/api";
+import { defaultLevel, getOptions, me, startRound, type Options, type RoundModality, type User } from "@/lib/api";
 
 // Only round types with a real interviewer can actually be started here -
 // see apps/api/orchestrator.py's REAL_ROUND_TYPES (the backend re-validates
@@ -42,6 +42,7 @@ function SetupPageContent() {
   const roundType = ROUND_TYPE_LABELS[searchParams.get("type") ?? ""] ? (searchParams.get("type") as string) : "ml_system_design";
   const roundTypeLabel = ROUND_TYPE_LABELS[roundType];
   const isMLDepth = roundType === "ml_depth";
+  const durationId = useId();
   const [user, setUser] = useState<User | null>(null);
   const [options, setOptions] = useState<Options | null>(null);
   const [roleFamily, setRoleFamily] = useState("");
@@ -70,7 +71,7 @@ function SetupPageContent() {
     getOptions().then((opts) => {
       setOptions(opts);
       setRoleFamily(opts.role_families[0]?.value ?? "");
-      setLevel(opts.levels[0]?.value ?? "");
+      setLevel(defaultLevel(opts.levels));
       // ML Depth defaults to "All sub-areas" (the candidate's own call - see
       // ML_DEPTH_DOMAIN_VALUES above) rather than whichever domain happens to
       // sort first; every other round type keeps today's first-option default.
@@ -147,8 +148,11 @@ function SetupPageContent() {
           <Select label="Company profile" value={company} onChange={setCompany} options={options.companies} />
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">Duration</label>
+            <label htmlFor={durationId} className="mb-1 block text-sm font-medium text-foreground">
+              Duration
+            </label>
             <select
+              id={durationId}
               value={duration ?? ""}
               onChange={(e) => setDuration(Number(e.target.value))}
               className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
@@ -170,8 +174,10 @@ function SetupPageContent() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">Format</label>
-            <div className="grid grid-cols-3 gap-2">
+            <span className="mb-1 block text-sm font-medium text-foreground" id="format-label">
+              Format
+            </span>
+            <div className="grid grid-cols-3 gap-2" role="group" aria-labelledby="format-label">
               {(
                 [
                   { value: "text", label: "Text" },
@@ -182,6 +188,7 @@ function SetupPageContent() {
                 <button
                   key={opt.value}
                   type="button"
+                  aria-pressed={mode === opt.value}
                   onClick={() => setMode(opt.value)}
                   className={
                     "rounded-md border px-3 py-2 text-sm font-medium " +
@@ -234,11 +241,18 @@ function Select({
   options: { value: string; label: string }[];
   helperText?: string;
 }) {
+  // RZ-03 (UI/UX review, 2026-09-29): every <select> here rendered a
+  // visible <label> with no htmlFor/id association, so clicking the label
+  // text did nothing and screen readers announced the field with no name.
+  const id = useId();
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-foreground">{label}</label>
+      <label htmlFor={id} className="mb-1 block text-sm font-medium text-foreground">
+        {label}
+      </label>
       {helperText && <p className="mb-1 text-xs text-muted-foreground">{helperText}</p>}
       <select
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"

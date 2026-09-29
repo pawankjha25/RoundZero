@@ -16,7 +16,9 @@
 // candidate can check the claim themselves. No fabricated timestamps (turns
 // don't carry wall-clock time, only turn_index) and no "Replay Moment" jump
 // (blocked on spec 002 P0.9 - no per-timestamp replay data exists yet).
+import { useRef } from "react";
 import type { DimensionScore, Turn } from "@/lib/api";
+import { useOverlayDismiss } from "@/lib/hooks/useOverlayDismiss";
 
 function TurnRow({ turn }: { turn: Turn }) {
   return (
@@ -41,6 +43,8 @@ export default function EvidenceDrawer({
   onClose: () => void;
 }) {
   const open = dimension !== null;
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  useOverlayDismiss(open, onClose, panelRef);
 
   return (
     <>
@@ -55,6 +59,7 @@ export default function EvidenceDrawer({
       />
       {/* Panel */}
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={dimension ? `Evidence for ${dimension.label}` : "Evidence"}

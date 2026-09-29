@@ -147,6 +147,32 @@ export default function ReportPage() {
     );
   }
 
+  // RZ-02 (UI/UX review, 2026-09-29): a round submitted with no candidate
+  // responses at all used to render exactly like a genuine, thorough
+  // failure - "0% readiness / NO HIRE" - because the evaluator scored every
+  // rubric dimension NOT_COVERED against an empty transcript. The backend
+  // now flags this case explicitly (RoundEvaluation.not_assessed) instead
+  // of fabricating a score, so show that honestly here rather than the
+  // normal report layout (whose dimension/strengths/plan sections would
+  // otherwise just render as empty and confusing, not obviously "this round
+  // wasn't attempted").
+  if (report.not_assessed) {
+    return (
+      <AppShell user={user} active="loops">
+        <div className="mx-auto max-w-md py-24 text-center">
+          <p className="text-lg font-semibold text-foreground">Not assessed</p>
+          <p className="mt-2 text-body text-muted-foreground">
+            No responses were submitted before this round ended, so there&apos;s nothing to score - this isn&apos;t
+            counted as a failed attempt.
+          </p>
+          <Link href="/practice" className="mt-6 inline-block text-sm text-accent hover:underline">
+            Start a new round &rarr;
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
+
   const sortedDims = [...report.dimension_scores].sort((a, b) => b.weight - a.weight);
   const tone = hireSignalTone(report.hire_signal);
 

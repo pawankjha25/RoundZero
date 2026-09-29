@@ -10,9 +10,10 @@
 // rounds_included (Founding Members' "no practical ceiling" - see
 // UserEntitlement's docstring in apps/api/models.py) reads as "Unlimited"
 // rather than a literal huge number.
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import type { User } from "@/lib/api";
+import { useOverlayDismiss } from "@/lib/hooks/useOverlayDismiss";
 
 const UNLIMITED_THRESHOLD = 1000;
 
@@ -23,6 +24,14 @@ function daysUntil(iso: string): number {
 
 export default function QuotaPill({ user }: { user: User }) {
   const [open, setOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  // RZ-04 (UI/UX review, 2026-09-29): Escape now closes this popover and
+  // returns focus to the trigger button, matching FeedbackWidget/
+  // EvidenceDrawer. autoFocus is off here specifically - the trigger's own
+  // onBlur below already closes the popover after a short delay, and
+  // stealing focus into the panel on open would fire that blur immediately
+  // and race with it.
+  useOverlayDismiss(open, () => setOpen(false), panelRef, { autoFocus: false });
   const { entitlement } = user;
   const { cohort, plan, rounds_included, rounds_used, rounds_remaining, expires_at, is_expired } = entitlement;
 
@@ -31,7 +40,14 @@ export default function QuotaPill({ user }: { user: User }) {
   // they once had rounds to run out of.
   const isUnsubscribed = plan === "unselected";
   const isUnlimited = rounds_included >= UNLIMITED_THRESHOLD;
-  const isFreeCohort = plan === "none";
+  // RZ-05 (UI/UX review, 2026-09-29): cohort ("tester"/"normal"/"paid") and
+  // plan ("none"/"monthly"/...) are independent - a dogfooder/tester with
+  // plan="none" was previously labeled "Free trial plan" identically to a
+  // real self-signup free user, even though testers get 8 rounds with no
+  // 7-day expiry (pricing-design.md's cohort grants) rather than the real
+  // free tier's 1 round / 7 days. Distinguish them explicitly.
+  const isTesterCohort = cohort === "tester";
+  const isFreeCohort = plan === "none" && !isTesterCohort;
   const daysLeft = expires_at ? daysUntil(expires_at) : null;
 
   let tone: "quiet" | "warning" | "urgent" = "quiet";
@@ -76,7 +92,10 @@ export default function QuotaPill({ user }: { user: User }) {
         {label}
       </button>
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-64 rounded-md border border-border bg-surface p-4 shadow-lg">
+        <div
+          ref={panelRef}
+          className="absolute right-0 z-20 mt-2 w-64 rounded-md border border-border bg-surface p-4 shadow-lg"
+        >
           {isUnsubscribed ? (
             <p className="text-sm text-muted-foreground">
               You haven&apos;t picked a plan yet - even the free one only takes a click.
@@ -84,7 +103,7 @@ export default function QuotaPill({ user }: { user: User }) {
           ) : (
             <>
               <p className="text-sm font-medium capitalize text-foreground">
-                {plan === "none" ? "Free trial" : plan} plan
+                {isTesterCohort ? "Tester access" : plan === "none" ? "Free trial" : `${plan} plan`}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {isUnlimited ? "No practical round limit." : `${rounds_used} of ${rounds_included} rounds used this period.`}

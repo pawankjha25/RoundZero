@@ -120,6 +120,7 @@ function buildReadinessPoints(loops: HistoryItem[]): ReadinessPoint[] {
       pct: r.readiness_pct as number,
       hireSignal: r.hire_signal as string,
       roundTypeLabel: ROUND_TYPE_LABELS.get(r.round_type) ?? r.round_type,
+      roundType: r.round_type,
     }));
 }
 
@@ -135,11 +136,24 @@ function buildDiagnosis(summary: ReportSummary, points: ReadinessPoint[]): strin
   const loopWord = summary.total_loops === 1 ? "loop" : "loops";
   let text = `You've completed ${summary.evaluated_rounds} evaluated ${roundWord} across ${summary.total_loops} ${loopWord}, averaging ${summary.avg_readiness_pct ?? "-"}% readiness.`;
 
+  // RZ-12 (UI/UX review, 2026-09-29): trend direction used to compare the
+  // very first evaluated round ever against the very latest, regardless of
+  // round type - a candidate whose first round was Coding and whose latest
+  // was ML System Design could get "trending down" purely because the two
+  // round types score on different rubrics, not because they got worse.
+  // Now the comparison is scoped to the same round type as the most recent
+  // round, matching how the per-dimension trend charts below are already
+  // scoped per round type. If there's only one evaluated round of that
+  // type so far, no trend sentence is shown at all - a two-round-type
+  // comparison would be a fabricated trend, not an honest one.
   if (points.length >= 2) {
-    const first = points[0];
     const last = points[points.length - 1];
-    const direction = last.pct > first.pct ? "trending up" : last.pct < first.pct ? "trending down" : "holding steady";
-    text += ` Your first evaluated round (${first.roundTypeLabel}, ${first.label}) scored ${first.pct}%; your most recent (${last.roundTypeLabel}, ${last.label}) scored ${last.pct}% - ${direction}.`;
+    const sameTypePoints = points.filter((p) => p.roundType === last.roundType);
+    if (sameTypePoints.length >= 2) {
+      const first = sameTypePoints[0];
+      const direction = last.pct > first.pct ? "trending up" : last.pct < first.pct ? "trending down" : "holding steady";
+      text += ` Your first evaluated ${last.roundTypeLabel} round (${first.label}) scored ${first.pct}%; your most recent (${last.label}) scored ${last.pct}% - ${direction}.`;
+    }
   }
 
   if (summary.weakest_dimensions.length > 0) {

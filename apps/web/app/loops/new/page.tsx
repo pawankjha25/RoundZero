@@ -8,14 +8,14 @@
 // apps/api/orchestrator.py::REAL_ROUND_TYPES) can actually be started later -
 // the rest are included in the loop's shape honestly, same "show where it's
 // headed" pattern the old /loop-planner preview used.
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import Button from "@/components/ui/Button";
 import RoundTypeIcon from "@/components/RoundTypeIcon";
 import { ROUND_TYPES } from "@/lib/roundTypes";
-import { createLoop, getOptions, me, suggestLoopName, type Options, type RoundModality, type User } from "@/lib/api";
+import { createLoop, defaultLevel, getOptions, me, suggestLoopName, type Options, type RoundModality, type User } from "@/lib/api";
 
 export default function NewLoopPage() {
   const router = useRouter();
@@ -51,7 +51,7 @@ export default function NewLoopPage() {
     getOptions().then((opts) => {
       setOptions(opts);
       setRoleFamily(opts.role_families[0]?.value ?? "");
-      setLevel(opts.levels[0]?.value ?? "");
+      setLevel(defaultLevel(opts.levels));
       setDomain(opts.domains[0]?.value ?? "");
       setCompany(opts.companies[0]?.value ?? "");
     });
@@ -189,8 +189,10 @@ export default function NewLoopPage() {
           <Select label="Company profile" value={company} onChange={setCompany} options={options.companies} />
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-foreground">Format</label>
-            <div className="grid grid-cols-3 gap-2">
+            <span className="mb-1 block text-sm font-medium text-foreground" id="format-label">
+              Format
+            </span>
+            <div className="grid grid-cols-3 gap-2" role="group" aria-labelledby="format-label">
               {(
                 [
                   { value: "text", label: "Text" },
@@ -201,6 +203,7 @@ export default function NewLoopPage() {
                 <button
                   key={opt.value}
                   type="button"
+                  aria-pressed={mode === opt.value}
                   onClick={() => setMode(opt.value)}
                   className={
                     "rounded-md border px-3 py-2 text-sm font-medium " +
@@ -276,11 +279,18 @@ function Select({
   options: { value: string; label: string }[];
   helperText?: string;
 }) {
+  // RZ-03 (UI/UX review, 2026-09-29): every <select> here rendered a
+  // visible <label> with no htmlFor/id association, so clicking the label
+  // text did nothing and screen readers announced the field with no name.
+  const id = useId();
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-foreground">{label}</label>
+      <label htmlFor={id} className="mb-1 block text-sm font-medium text-foreground">
+        {label}
+      </label>
       {helperText && <p className="mb-1 text-xs text-muted-foreground">{helperText}</p>}
       <select
+        id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"

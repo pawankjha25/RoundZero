@@ -63,6 +63,10 @@ export interface ReadinessPoint {
   pct: number;
   hireSignal: string;
   roundTypeLabel: string;
+  // Raw round_type key (e.g. "ml_system_design"), kept alongside the
+  // display label so callers can group/compare points by round type
+  // (see app/progress/page.tsx's buildDiagnosis - RZ-12 fix).
+  roundType: string;
 }
 
 function ReadinessTooltip({ active, payload }: TooltipContentProps) {

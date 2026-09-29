@@ -211,13 +211,20 @@ export default function LoopDebriefPage() {
             {loop.rounds.map((round) => {
               const started = round.started;
               const label = ROUND_TYPE_LABELS.get(round.round_type) ?? formatLabel(round.round_type);
+              // RZ-02 (UI/UX review, 2026-09-29): EVALUATED with a null
+              // readiness_pct means this round was submitted with no
+              // candidate responses at all - say so plainly rather than
+              // falling through to the generic "Evaluated" label (same fix
+              // as components/loops/LoopList.tsx::roundStatusLine).
               const statusLine =
                 started === null
                   ? round.startable
                     ? "Not started"
                     : "Not available yet"
-                  : started.status === "EVALUATED" && started.readiness_pct !== null
-                    ? `${started.readiness_pct}% readiness - ${started.hire_signal}`
+                  : started.status === "EVALUATED"
+                    ? started.readiness_pct !== null
+                      ? `${started.readiness_pct}% readiness - ${started.hire_signal}`
+                      : "Not assessed - no responses submitted"
                     : formatLabel(started.status);
               const href = started
                 ? started.status === "ACTIVE" || started.status === "WRAP_UP"

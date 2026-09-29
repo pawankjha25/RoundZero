@@ -13,9 +13,10 @@
 // Hides itself on any route where `me()` fails (not logged in yet, e.g.
 // /login) rather than redirecting - that's each page's own job, not this
 // widget's.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { me, submitFeedback, type FeedbackKind } from "@/lib/api";
+import { useOverlayDismiss } from "@/lib/hooks/useOverlayDismiss";
 
 const KIND_OPTIONS: { value: FeedbackKind; label: string }[] = [
   { value: "feedback", label: "Feedback" },
@@ -32,6 +33,8 @@ export default function FeedbackWidget() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  useOverlayDismiss(open, () => setOpen(false), panelRef);
 
   useEffect(() => {
     me()
@@ -83,6 +86,7 @@ export default function FeedbackWidget() {
 
       {open && (
         <div
+          ref={panelRef}
           role="dialog"
           aria-modal="true"
           aria-label="Send feedback"

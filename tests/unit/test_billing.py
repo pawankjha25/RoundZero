@@ -51,12 +51,18 @@ _app.dependency_overrides[get_db] = _override_get_db
 client = TestClient(_app)
 
 
-def _as_user(user_id: str, email: str = "buyer@example.com", name: str = "Buyer"):
+def _as_user(user_id: str, email: str | None = None, name: str = "Buyer"):
+    # email defaults to one derived from user_id, not a shared literal -
+    # users.email is unique now (2026-09-29 fix), and several tests in this
+    # file each create their own throwaway user via this helper, so a fixed
+    # default would collide across tests sharing the module-level engine.
+    resolved_email = email or f"{user_id}@example.com"
+
     def _dep():
         db = SessionLocal()
         u = db.get(User, user_id)
         if u is None:
-            u = User(id=user_id, email=email, name=name)
+            u = User(id=user_id, email=resolved_email, name=name)
             db.add(u)
             db.commit()
             db.refresh(u)

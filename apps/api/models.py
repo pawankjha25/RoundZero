@@ -35,17 +35,27 @@ def _now() -> datetime:
 class User(Base):
     """Local shadow profile of a Supabase auth.users row (apps/api/deps.py upserts
     this on first request). Keyed by `id` == Supabase's `sub` claim, which is the
-    only identity Supabase guarantees is stable - `email` is NOT unique here even
-    though it usually is in practice, because Supabase can mint more than one
-    distinct auth.users.id for what a person considers "the same" email (e.g.
-    signing in via Google after an earlier email/password or a since-deleted test
-    account). Deduping on email in this table would crash real logins over an
-    identity question that is Supabase's to resolve, not ours."""
+    only identity Supabase guarantees is stable.
+
+    `email` IS unique here (added 2026-09-29, after a real duplicate showed up
+    in dev: Google sign-in and the email magic link minted two different
+    Supabase auth.users ids for the same address, so get_current_user's old
+    id-only upsert created two separate rows - two separate entitlements, two
+    separate round histories, for what's really one person). The risk with
+    enforcing this the naive way is real: if Supabase ever mints a new
+    auth.users id for an email that used to belong to a different, unrelated
+    account (their docstring example: a since-deleted test account), a bare
+    UNIQUE constraint would make that person's next login 500 instead of
+    quietly diverging. apps/api/deps.py::get_current_user handles this - on a
+    UNIQUE collision it looks the row up by email and reuses it (same
+    person's other login method) rather than crashing, so the only behavior
+    change for a genuine identity edge case is "shares the earlier account"
+    instead of "crashes"."""
 
     __tablename__ = "users"
 
     id = Column(String, primary_key=True, default=_uuid)
-    email = Column(String, nullable=False, index=True)
+    email = Column(String, nullable=False, unique=True, index=True)
     name = Column(String, nullable=False)
     created_at = Column(DateTime, default=_now)
     # Set the first time this user completes a real Stripe Checkout (Phase 2 -
@@ -404,6 +414,16 @@ class EvaluationRecord(Base):
     weaknesses = Column(JSON, nullable=False)
     improvement_plan = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=_now)
+    # RZ-02 (UI/UX review, 2026-09-29): true when this round was submitted
+    # with no candidate responses at all - readiness_pct/hire_signal above
+    # still hold harmless placeholder values (0 / "NOT_ASSESSED") rather
+    # than nullable columns (avoids a wider migration touching every
+    # non-nullable consumer of those two columns); every reader must check
+    # this flag first instead of trusting them directly. See
+    # roundzero.evaluation.models.ScoredRound's docstring for the full
+    # rationale and apps/api/orchestrator.py::submit_round for where it's
+    # set. Added via migrations/0008_evaluations_not_assessed.py.
+    not_assessed = Column(Boolean, nullable=False, default=False)
 
 
 class LoopCommitteeRecord(Base):

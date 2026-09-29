@@ -14,6 +14,7 @@ import AppShell from "@/components/AppShell";
 import Button from "@/components/ui/Button";
 import {
   createRealInterview,
+  defaultLevel,
   getOptions,
   listLoops,
   me,
@@ -99,7 +100,7 @@ function NewRealInterviewPageContent() {
     getOptions().then((opts) => {
       setOptions(opts);
       setRoleFamily(searchParams.get("role_family") ?? opts.role_families[0]?.value ?? "");
-      setLevel(searchParams.get("level") ?? opts.levels[0]?.value ?? "");
+      setLevel(searchParams.get("level") ?? defaultLevel(opts.levels));
       setDomain(searchParams.get("domain") ?? opts.domains[0]?.value ?? "");
     });
     listLoops().then(setLoops).catch(() => setLoops([]));

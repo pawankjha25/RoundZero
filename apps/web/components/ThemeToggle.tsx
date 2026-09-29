@@ -1,7 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
+
+// Client-mount detector with no setState-in-effect at all (the previous
+// `useState(false)` + `useEffect(() => setMounted(true), [])` version hit
+// the react-hooks/set-state-in-effect rule, even though it's the exact
+// pattern next-themes' own docs recommend for this). useSyncExternalStore
+// needs no subscription here - mount status never changes again once true,
+// so `subscribe` is a permanent no-op - it just returns the server snapshot
+// (false) during SSR/hydration and the client snapshot (true) once mounted,
+// which is the whole point: differ once, then never re-notify.
+function useIsMounted(): boolean {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+}
 
 // Explicit two-state light/dark toggle (not a three-way incl. "system") -
 // simplest predictable behavior: it always shows what the page currently
@@ -14,8 +30,7 @@ export default function ThemeToggle() {
   // localStorage/matchMedia, both client-only) - rendering a fixed-size
   // placeholder until mounted avoids a hydration mismatch and keeps the
   // header from jumping when the real icon appears a tick later.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useIsMounted();
 
   if (!mounted) {
     return <span className="inline-block h-8 w-8" aria-hidden="true" />;

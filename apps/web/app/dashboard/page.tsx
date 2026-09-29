@@ -71,7 +71,18 @@ export default function DashboardPage() {
             </h1>
             <p className="mt-1 text-base text-muted-foreground">Where you left off, and what&apos;s next.</p>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1">
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            {/* RZ-09 (UI/UX review, 2026-09-29): returning users (loops.length
+                > 0) landed on a list of existing loops with no obvious way to
+                start a new practice round from this page - only the top nav's
+                "Practice" link, easy to miss. First-time users already get an
+                equivalent primary action via the EmptyState below, so this
+                only needs to show once there's something to return to. */}
+            {loops && loops.length > 0 && (
+              <Button href="/practice" className="whitespace-nowrap">
+                Start practice
+              </Button>
+            )}
             <Link href="/real-interviews" className="whitespace-nowrap text-sm text-accent hover:underline">
               Log a real interview &rarr;
             </Link>

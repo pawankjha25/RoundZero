@@ -1,11 +1,13 @@
 "use client";
 
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import QuotaPill from "@/components/QuotaPill";
 import ThemeToggle from "@/components/ThemeToggle";
 import { logout, type User } from "@/lib/api";
+import { useOverlayDismiss } from "@/lib/hooks/useOverlayDismiss";
 
 interface AppShellProps {
   user: User | null;
@@ -29,6 +31,15 @@ const BASE_NAV_ITEMS: { key: AppShellProps["active"]; label: string; href: strin
 
 export default function AppShell({ user, active, children }: AppShellProps) {
   const router = useRouter();
+  // RZ-01 (UI/UX review, 2026-09-29): the nav (5-6 items) plus the account
+  // controls (quota pill, profile, sign out, theme toggle) were one
+  // unbreaking flex row - on a narrow viewport they either overflowed the
+  // header or got squeezed unreadable, with no responsive fallback at all.
+  // Below md, both rows collapse into one hamburger-triggered menu instead;
+  // md and up keep the original always-visible inline layout unchanged.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useOverlayDismiss(menuOpen, () => setMenuOpen(false), menuRef);
 
   async function handleLogout() {
     await logout();
@@ -64,7 +75,7 @@ export default function AppShell({ user, active, children }: AppShellProps) {
             <Link href="/dashboard" className="text-foreground">
               <Logo />
             </Link>
-            <nav className="flex items-center gap-5">
+            <nav className="hidden items-center gap-5 md:flex">
               {navItems.map((item) => (
                 <Link
                   key={item.href}
@@ -86,7 +97,7 @@ export default function AppShell({ user, active, children }: AppShellProps) {
               ))}
             </nav>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="hidden items-center gap-4 md:flex">
             {user && <QuotaPill user={user} />}
             <Link
               href="/profile"
@@ -102,7 +113,59 @@ export default function AppShell({ user, active, children }: AppShellProps) {
             </button>
             <ThemeToggle />
           </div>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav-menu"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            className="rounded-md border border-border px-2.5 py-1.5 text-base text-foreground md:hidden"
+          >
+            {menuOpen ? "✕" : "☰"}
+          </button>
         </div>
+        {menuOpen && (
+          <div id="mobile-nav-menu" ref={menuRef} className="border-t border-border px-6 py-4 md:hidden">
+            <nav className="flex flex-col gap-1">
+              {navItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMenuOpen(false)}
+                  className={
+                    "rounded-md px-2 py-2 text-base text-foreground " +
+                    (active === item.key ? "font-semibold" : "font-normal opacity-80")
+                  }
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3">
+              {user && <QuotaPill user={user} />}
+              <Link
+                href="/profile"
+                onClick={() => setMenuOpen(false)}
+                className={
+                  "text-sm " +
+                  (active === "profile" ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground")
+                }
+              >
+                {user?.name.split(" ")[0] ?? "Profile"}
+              </Link>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  handleLogout();
+                }}
+                className="text-left text-sm text-muted-foreground hover:text-foreground"
+              >
+                Sign out
+              </button>
+              <ThemeToggle />
+            </div>
+          </div>
+        )}
       </header>
       <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
     </div>

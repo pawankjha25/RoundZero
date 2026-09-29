@@ -68,10 +68,10 @@ from roundzero.debrief.synthesis import llm_report_synthesis, primary_concern, s
 from roundzero.domain.enums import CoverageStatus, Phase
 from roundzero.domain.interview import ConversationState, ConversationTurn, TargetRole
 from roundzero.evaluation.evaluator import Evaluator, LLMEvaluator, RuleBasedEvaluator
-from roundzero.evaluation.models import RoundEvaluation
+from roundzero.evaluation.models import RoundEvaluation, ScoredRound
 from roundzero.evaluation.rubric_loader import rubric_dimension_keys
 from roundzero.improvement.plan import build_improvement_plan
-from roundzero.leveling.calibration import calibrate_level
+from roundzero.leveling.calibration import LevelCalibration, calibrate_level
 from roundzero.interviewers.backend_system_design.agent import BackendSystemDesignInterviewer
 from roundzero.interviewers.coding.agent import CodingInterviewer
 from roundzero.interviewers.ml_depth.agent import MLDepthInterviewer
@@ -1111,32 +1111,60 @@ def submit_round(db: DBSession, round_: RoundAttempt) -> RoundEvaluation:
         for t in turns
     ]
 
-    try:
-        scored = get_evaluator().evaluate(
-            round_id=round_.id,
-            round_type=round_.round_type,
-            transcript=transcript,
-            final_coverage=round_.coverage,
-        )
-        strengths, weaknesses = strengths_and_weaknesses(scored.dimension_scores)
+    # RZ-02 (UI/UX review, 2026-09-29): a round submitted with zero candidate
+    # responses (abandoned right after starting, or ended immediately) used
+    # to go through the exact same rubric scoring as a genuinely completed
+    # round - every dimension defaults to NOT_COVERED with nothing to
+    # collect evidence from, so it always came out 0% readiness / NO HIRE,
+    # indistinguishable from a real, thorough failure. Checked here, before
+    # the evaluator (and any LLM synthesis call) even runs, rather than
+    # inside RuleBasedEvaluator/LLMEvaluator - this is a round-level
+    # question ("was there anything to score at all"), not something either
+    # evaluator implementation should each have to reimplement, and it also
+    # means an empty round never spends a real LLM call on nothing.
+    not_assessed = not any(t["speaker"] == "candidate" and t["text"].strip() for t in transcript)
 
-        if os.environ.get("OPENAI_API_KEY"):
-            concern, plan = llm_report_synthesis(
-                OpenAIGateway(), scored.dimension_scores, round_type=round_.round_type
+    if not_assessed:
+        scored = ScoredRound(
+            round_id=round_.id, dimension_scores=[], readiness_pct=0, hire_signal="NOT_ASSESSED", not_assessed=True
+        )
+        strengths, weaknesses = [], []
+        concern = "Not assessed - no responses were submitted before this round ended."
+        plan = []
+        level_calibration = LevelCalibration(
+            narrative=(
+                "Not assessed - no responses were submitted before this round ended, "
+                "so there's nothing to calibrate a level against."
             )
-        else:
-            concern = primary_concern(scored.dimension_scores)
-            plan = build_improvement_plan(scored.dimension_scores)
-    except Exception as exc:
-        logger.exception("Evaluation failed for round_id=%s", round_.id)
-        # Back out of EVALUATING (committed above) so a retried Submit re-enters
-        # this function cleanly instead of finding the round permanently wedged.
-        round_.status = "SUBMITTED"
-        db.commit()
-        raise EvaluationUnavailableError(
-            "Scoring this round hit a temporary error (rate limited or an outage) - "
-            "please try Submit again in a moment."
-        ) from exc
+        )
+    else:
+        try:
+            scored = get_evaluator().evaluate(
+                round_id=round_.id,
+                round_type=round_.round_type,
+                transcript=transcript,
+                final_coverage=round_.coverage,
+            )
+            strengths, weaknesses = strengths_and_weaknesses(scored.dimension_scores)
+
+            if os.environ.get("OPENAI_API_KEY"):
+                concern, plan = llm_report_synthesis(
+                    OpenAIGateway(), scored.dimension_scores, round_type=round_.round_type
+                )
+            else:
+                concern = primary_concern(scored.dimension_scores)
+                plan = build_improvement_plan(scored.dimension_scores)
+        except Exception as exc:
+            logger.exception("Evaluation failed for round_id=%s", round_.id)
+            # Back out of EVALUATING (committed above) so a retried Submit re-enters
+            # this function cleanly instead of finding the round permanently wedged.
+            round_.status = "SUBMITTED"
+            db.commit()
+            raise EvaluationUnavailableError(
+                "Scoring this round hit a temporary error (rate limited or an outage) - "
+                "please try Submit again in a moment."
+            ) from exc
+        level_calibration = calibrate_level(scored.readiness_pct, scored.hire_signal)
 
     evaluation = RoundEvaluation(
         round_id=round_.id,
@@ -1147,7 +1175,8 @@ def submit_round(db: DBSession, round_: RoundAttempt) -> RoundEvaluation:
         strengths=strengths,
         weaknesses=weaknesses,
         improvement_plan=plan,
-        level_calibration=calibrate_level(scored.readiness_pct, scored.hire_signal),
+        level_calibration=level_calibration,
+        not_assessed=scored.not_assessed,
     )
 
     record = EvaluationRecord(
@@ -1159,6 +1188,7 @@ def submit_round(db: DBSession, round_: RoundAttempt) -> RoundEvaluation:
         strengths=evaluation.strengths,
         weaknesses=evaluation.weaknesses,
         improvement_plan=[i.model_dump() for i in evaluation.improvement_plan],
+        not_assessed=evaluation.not_assessed,
     )
     db.add(record)
     round_.status = "EVALUATED"
@@ -1167,6 +1197,21 @@ def submit_round(db: DBSession, round_: RoundAttempt) -> RoundEvaluation:
 
 
 def _record_to_evaluation(record: EvaluationRecord) -> RoundEvaluation:
+    # RZ-02: a stored not_assessed record still carries placeholder
+    # readiness_pct=0/hire_signal="NOT_ASSESSED" (see EvaluationRecord's
+    # docstring) - calibrate_level would turn that into a misleading "this
+    # round doesn't clear the bar" narrative every time it's re-read, so
+    # skip it the same way submit_round does when the record is fresh.
+    level_calibration = (
+        LevelCalibration(
+            narrative=(
+                "Not assessed - no responses were submitted before this round ended, "
+                "so there's nothing to calibrate a level against."
+            )
+        )
+        if record.not_assessed
+        else calibrate_level(record.readiness_pct, record.hire_signal)
+    )
     return RoundEvaluation(
         round_id=record.round_id,
         dimension_scores=record.dimension_scores,
@@ -1176,7 +1221,8 @@ def _record_to_evaluation(record: EvaluationRecord) -> RoundEvaluation:
         strengths=record.strengths,
         weaknesses=record.weaknesses,
         improvement_plan=record.improvement_plan,
-        level_calibration=calibrate_level(record.readiness_pct, record.hire_signal),
+        level_calibration=level_calibration,
+        not_assessed=record.not_assessed,
     )
 
 
@@ -1192,6 +1238,12 @@ def history_item_out(round_: RoundAttempt, evaluation: RoundEvaluation | None) -
     same summary shape for a round - readiness_pct/hire_signal come from the
     evaluation when one exists (None for a round that hasn't been submitted/
     evaluated yet), everything else from the round itself."""
+    # RZ-02: a not_assessed evaluation exists (the round did reach
+    # EVALUATED) but has nothing real to report - treated the same as "no
+    # evaluation yet" here so every place that already does
+    # `readiness_pct is not None` to mean "has a real score" (progress
+    # trends, report summary averages, etc.) excludes it automatically.
+    has_real_score = evaluation is not None and not evaluation.not_assessed
     return HistoryItemOut(
         id=round_.id,
         loop_attempt_id=round_.loop_attempt_id,
@@ -1202,8 +1254,8 @@ def history_item_out(round_: RoundAttempt, evaluation: RoundEvaluation | None) -
         company_profile=round_.company_profile,
         duration_minutes=round_.duration_minutes,
         status=round_.status,
-        readiness_pct=evaluation.readiness_pct if evaluation else None,
-        hire_signal=evaluation.hire_signal if evaluation else None,
+        readiness_pct=evaluation.readiness_pct if has_real_score else None,
+        hire_signal=evaluation.hire_signal if has_real_score else None,
         created_at=round_.created_at,
         submitted_at=round_.submitted_at,
     )
@@ -1222,7 +1274,10 @@ def compare_rounds(db: DBSession, round_a: RoundAttempt, round_b: RoundAttempt) 
     older, newer = (round_a, round_b) if round_a.created_at <= round_b.created_at else (round_b, round_a)
     eval_older = get_report(db, older.id)
     eval_newer = get_report(db, newer.id)
-    if eval_older is None or eval_newer is None:
+    # RZ-02: a not_assessed round (empty - nothing to compare) is treated
+    # the same as "not evaluated yet" here, same reasoning as
+    # history_item_out above.
+    if eval_older is None or eval_newer is None or eval_older.not_assessed or eval_newer.not_assessed:
         return None
 
     newer_by_dim = {d.dimension: d for d in eval_newer.dimension_scores}
@@ -1273,7 +1328,12 @@ def loop_committee_eligible(db: DBSession, loop: LoopAttempt) -> list[tuple[str,
         if round_ is None or round_.status != "EVALUATED":
             return []
         evaluation = get_report(db, round_.id)
-        if evaluation is None:
+        # RZ-02: a not_assessed round (nothing was actually submitted) has
+        # no real signal to synthesize into a committee verdict - treat the
+        # loop as not yet eligible, same as if this round were still in
+        # progress, rather than let it drag the synthesis toward a
+        # fabricated 0%/NO HIRE contribution.
+        if evaluation is None or evaluation.not_assessed:
             return []
         result.append((p.round_type, round_, evaluation))
 
@@ -1531,7 +1591,9 @@ def real_interview_prediction(db: DBSession, experience: RealInterviewExperience
         if planned.round_attempt_id is None:
             continue
         evaluation = get_report(db, planned.round_attempt_id)
-        if evaluation is not None and (best is None or evaluation.readiness_pct > best.readiness_pct):
+        # RZ-02: skip not_assessed rounds entirely rather than let their
+        # placeholder readiness_pct=0 ever be picked as "best".
+        if evaluation is not None and not evaluation.not_assessed and (best is None or evaluation.readiness_pct > best.readiness_pct):
             best = evaluation
     if best is None:
         return None
@@ -1970,9 +2032,12 @@ def question_progress(db: DBSession, question_id: str) -> QuestionProgressOut:
 
     latest = attempts[0]
     evaluation = get_report(db, latest.id)
+    # RZ-02: same has_real_score treatment as history_item_out above - a
+    # not_assessed evaluation reads as "no score yet", not a fabricated 0%.
+    has_real_score = evaluation is not None and not evaluation.not_assessed
     return QuestionProgressOut(
         attempts=len(attempts),
         latest_status=latest.status,
-        latest_readiness_pct=evaluation.readiness_pct if evaluation else None,
-        latest_hire_signal=evaluation.hire_signal if evaluation else None,
+        latest_readiness_pct=evaluation.readiness_pct if has_real_score else None,
+        latest_hire_signal=evaluation.hire_signal if has_real_score else None,
     )

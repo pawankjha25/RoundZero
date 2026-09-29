@@ -58,6 +58,14 @@ function roundStatusLine(round: PlannedRound): string {
   if (h.status === "ACTIVE" || h.status === "WRAP_UP") {
     return "In progress";
   }
+  // RZ-02 (UI/UX review, 2026-09-29): EVALUATED with a null readiness_pct
+  // means this round was submitted with no candidate responses at all
+  // (apps/api/orchestrator.py::submit_round's not_assessed path) - say so
+  // plainly rather than falling through to the generic "Evaluated" label,
+  // which could read as "scored, and you're not seeing why."
+  if (h.status === "EVALUATED") {
+    return "Not assessed - no responses submitted";
+  }
   return formatLabel(h.status);
 }
 

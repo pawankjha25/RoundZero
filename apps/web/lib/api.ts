@@ -148,6 +148,17 @@ export function getOptions(): Promise<Options> {
   return apiFetch<Options>("/v1/config/options");
 }
 
+// DOG-002 (dogfooding QA, 2026-09-29): every round-setup form used to default
+// Level to levels[0] ("Entry Level"), which immediately shows the "not
+// calibrated for your level yet" warning since evaluation is only tuned for
+// Senior/Staff/Principal - a bad first impression for the Senior+ candidates
+// this app is actually built for. Defaults to "senior" when that option
+// exists, falling back to the first option otherwise (e.g. if an admin ever
+// removes "senior" from level_options).
+export function defaultLevel(levels: OptionItem[]): string {
+  return levels.find((l) => l.value === "senior")?.value ?? levels[0]?.value ?? "";
+}
+
 // --- Rounds (Milestone 1-3) ---
 
 export type RoundModality = "text" | "voice" | "both";
@@ -558,6 +569,12 @@ export interface RoundEvaluation {
   weaknesses: string[];
   improvement_plan: ImprovementItem[];
   level_calibration: LevelCalibration;
+  // RZ-02 (UI/UX review, 2026-09-29): true when this round was submitted
+  // with no candidate responses at all - readiness_pct/hire_signal above
+  // are harmless placeholders (0 / "NOT_ASSESSED"), never the real score.
+  // Check this before displaying either one - see apps/api/orchestrator.py
+  // ::submit_round and roundzero.evaluation.models.RoundEvaluation.
+  not_assessed: boolean;
 }
 
 // --- Candidate profile ---

@@ -170,16 +170,23 @@ def get_current_user(
         try:
             db.commit()
         except IntegrityError:
-            # Two concurrent first-time requests for the same brand-new
-            # Supabase user both saw no existing row and both tried to
-            # insert one - e.g. Next.js dev mode's React Strict Mode
-            # double-invokes effects, so the dashboard's me() call fires
-            # twice on mount. The loser hits a primary-key/unique
-            # collision here; that's not an auth failure, the winner's row
-            # is exactly what we would have written, so just read it back
-            # instead of 500ing this request.
+            # Two different collisions land here, both non-fatal:
+            #  1. Same brand-new Supabase user racing with itself (Next.js
+            #     dev mode's React Strict Mode double-invokes effects, so
+            #     the dashboard's me() call fires twice on mount) - a
+            #     primary-key collision, the winner's row is exactly what
+            #     we would have written.
+            #  2. A different Supabase auth.users id sharing this email -
+            #     e.g. Google OAuth vs the email magic link, which Supabase
+            #     doesn't automatically treat as the same identity - hits
+            #     email's UNIQUE constraint (models.py::User). This is the
+            #     case that models.py's docstring flags: rather than 500ing
+            #     this person's login, treat it as the same person's other
+            #     sign-in method and reuse their existing row/history.
+            # Either way, some row already represents this person - read it
+            # back instead of failing the request.
             db.rollback()
-            user = db.get(User, user_id)
+            user = db.get(User, user_id) or db.query(User).filter(User.email == email).first()
             if user is None:
                 raise
         else:
@@ -187,8 +194,20 @@ def get_current_user(
     elif user.email != email or (name and user.name != name):
         user.email = email
         user.name = name or user.name
-        db.commit()
-        db.refresh(user)
+        try:
+            db.commit()
+        except IntegrityError:
+            # This Supabase identity's email changed to one that's already
+            # taken by a different local User row (email's UNIQUE
+            # constraint) - an edge case, but one that must not 500 an
+            # otherwise-valid request. Keep this row's previous email
+            # rather than crash; the name change (if any) is lost too since
+            # it's the same commit, but that's a display nit, not a broken
+            # login.
+            db.rollback()
+            db.refresh(user)
+        else:
+            db.refresh(user)
     _ensure_entitlement(db, user)
     return user
 

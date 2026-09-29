@@ -38,7 +38,7 @@ import pytest  # noqa: E402
 
 from apps.api import orchestrator  # noqa: E402
 from apps.api.db import Base, SessionLocal, engine  # noqa: E402
-from apps.api.models import LoopAttempt, RoundAttempt  # noqa: E402
+from apps.api.models import LoopAttempt, RoundAttempt, TranscriptTurn  # noqa: E402
 from apps.api.schemas import StartRoundRequest  # noqa: E402
 from roundzero.llm.gateway import LLMGateway  # noqa: E402
 
@@ -127,6 +127,22 @@ class FailingEvaluator(Evaluator):
 
 def _create_completed_round(db, user_id: str) -> str:
     round_, _first_turn = orchestrator.create_round(db, user_id, _START_REQ)
+    # RZ-02 (UI/UX review, 2026-09-29): submit_round now short-circuits a
+    # round with no candidate turns at all straight to a "not assessed"
+    # result, without ever calling get_evaluator() - so this fixture needs
+    # one real candidate turn to keep exercising what this file actually
+    # tests (evaluator/provider failure and retry), not the not-assessed
+    # path.
+    db.add(
+        TranscriptTurn(
+            round_id=round_.id,
+            turn_index=1,
+            speaker="candidate",
+            text="I'd start by clarifying the latency and throughput requirements.",
+            phase="ACTIVE",
+        )
+    )
+    db.commit()
     return round_.id
 
 

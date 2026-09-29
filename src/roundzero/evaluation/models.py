@@ -42,6 +42,20 @@ class ScoredRound(BaseModel):
     dimension_scores: list[DimensionScore]
     readiness_pct: int
     hire_signal: str  # e.g. "LEAN HIRE" - PRD section 10.1 hire-signal scale
+    # RZ-02 (UI/UX review, 2026-09-29): a round submitted with no candidate
+    # responses at all (abandoned right after starting, or ended immediately)
+    # used to score every dimension NOT_COVERED like a genuinely attempted-
+    # and-failed round, producing a fabricated "0% readiness / NO HIRE" -
+    # indistinguishable from a real, thorough failure. apps/api/orchestrator.
+    # py::submit_round now detects this case *before* calling the evaluator
+    # at all (see its own comment) and builds a ScoredRound with this flag
+    # set instead of running rubric scoring against an empty transcript.
+    # readiness_pct/hire_signal still carry harmless placeholder values here
+    # (0 / "NOT_ASSESSED") only because the DB column and this field are
+    # both non-nullable - every real caller must check not_assessed first,
+    # never read them directly, same discipline the rest of this codebase
+    # already uses for "don't fabricate a number, check the flag/null first."
+    not_assessed: bool = False
 
 
 class ImprovementItem(BaseModel):
@@ -69,3 +83,10 @@ class RoundEvaluation(BaseModel):
     # docstring for why this is safe to compute from the existing scale rather
     # than a new per-level assessment.
     level_calibration: LevelCalibration
+    # RZ-02 (UI/UX review, 2026-09-29) - see ScoredRound.not_assessed above;
+    # carried through unchanged by orchestrator.py's submit_round/
+    # _record_to_evaluation. The report UI (and every aggregation site -
+    # history lists, progress trends, comparisons, committee synthesis,
+    # real-interview prediction) must check this before showing/using
+    # readiness_pct or hire_signal.
+    not_assessed: bool = False

@@ -11,7 +11,7 @@
 // work now. Monthly/Yearly/Founding Members are Phase 3 (subscriptions via
 // Stripe Billing) - not built - so those three cards stay disabled/"Coming
 // soon", matching the original 5-card layout from the design doc.
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { createCheckoutSession, me, subscribe, type PayPerLoopPack, type User } from "@/lib/api";
@@ -68,7 +68,7 @@ const PAYPERLOOP_PACKS: { pack: PayPerLoopPack; label: string; price: string }[]
   { pack: "pack_12", label: "12 rounds (about 3 loops)", price: "$80" },
 ];
 
-export default function UpgradePage() {
+function UpgradePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
@@ -160,6 +160,27 @@ export default function UpgradePage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {PLANS.map((plan) => {
             const isCurrent = currentPlan === plan.key;
+            // RZ-05 (UI/UX review, 2026-09-29): the "None" card's tagline
+            // and features were static marketing copy for the real free
+            // tier (1 round / 7 days) - shown as-is even for a tester/
+            // dogfooder whose actual "None"-plan entitlement is the more
+            // generous, no-expiry cohort grant (pricing-design.md's
+            // TESTER_EMAILS allowance). Once it's the signed-in user's
+            // actual current plan, show their real numbers instead of the
+            // generic pitch.
+            const isTesterOnNone = isCurrent && plan.key === "none" && user?.entitlement.cohort === "tester";
+            const tagline =
+              isTesterOnNone && user
+                ? `${user.entitlement.rounds_included} rounds, no expiry (tester access)`
+                : plan.tagline;
+            const features =
+              isTesterOnNone && user
+                ? [
+                    `${user.entitlement.rounds_remaining} of ${user.entitlement.rounds_included} rounds left`,
+                    "Full evaluation + report",
+                    "No expiry for tester access",
+                  ]
+                : plan.features;
             return (
               <div
                 key={plan.key}
@@ -171,11 +192,11 @@ export default function UpgradePage() {
               >
                 <p className="text-sm font-semibold text-foreground">{plan.name}</p>
                 <p className="mt-1 text-lg font-semibold text-foreground">{plan.price}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{plan.tagline}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{tagline}</p>
                 <ul className="mt-3 flex-1 space-y-1.5">
-                  {plan.features.map((f) => (
+                  {features.map((f) => (
                     <li key={f} className="text-xs text-muted-foreground">
-                      &check; {f}
+                      ✓ {f}
                     </li>
                   ))}
                 </ul>
@@ -215,8 +236,8 @@ export default function UpgradePage() {
             <p className="mt-1 text-lg font-semibold text-foreground">From $30</p>
             <p className="mt-1 text-xs text-muted-foreground">No subscription - just buy rounds</p>
             <ul className="mt-3 space-y-1.5">
-              <li className="text-xs text-muted-foreground">&check; One-time purchase</li>
-              <li className="text-xs text-muted-foreground">&check; No expiry</li>
+              <li className="text-xs text-muted-foreground">✓ One-time purchase</li>
+              <li className="text-xs text-muted-foreground">✓ No expiry</li>
             </ul>
             <div className="mt-4 flex-1 space-y-2">
               {PAYPERLOOP_PACKS.map((p) => (
@@ -242,5 +263,13 @@ export default function UpgradePage() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+export default function UpgradePage() {
+  return (
+    <Suspense fallback={null}>
+      <UpgradePageContent />
+    </Suspense>
   );
 }

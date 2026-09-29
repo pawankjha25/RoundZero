@@ -89,32 +89,41 @@ def get_report_summary(
 
     weakest: list[WeakDimensionOut] = []
     suggested: list[SuggestedResourceOut] = []
-    latest_evaluated_round = next((r for r in rounds if r.status == "EVALUATED"), None)
-    if latest_evaluated_round is not None:
-        evaluation = orchestrator.get_report(db, latest_evaluated_round.id)
-        if evaluation is not None:
-            # Same tie-break as roundzero.debrief.synthesis.strengths_and_weaknesses:
-            # lowest score first, and among equal scores the higher-weight
-            # (more critical) dimension counts as "weaker" for prioritization.
-            ranked = sorted(evaluation.dimension_scores, key=lambda d: (d.score, -d.weight))
-            weakest = [
-                WeakDimensionOut(dimension=d.dimension, label=d.label, score=d.score)
-                for d in ranked[:_N_WEAKEST]
-            ]
-            weak_dims = {d.dimension for d in weakest}
-            if weak_dims:
-                rows = (
-                    db.query(StudyResource)
-                    .filter(StudyResource.dimension.in_(weak_dims))
-                    .order_by(StudyResource.dimension, StudyResource.sort_order)
-                    .all()
+    # RZ-02 (UI/UX review, 2026-09-29): skip not_assessed rounds when
+    # looking for the "most recent evaluated round" to pull weakest
+    # dimensions from - an empty round has an empty dimension_scores list
+    # (nothing was scored), so picking it here would just silently show no
+    # focus areas even though an earlier round has real, usable scores.
+    latest_evaluation = None
+    for r in rounds:
+        if r.status != "EVALUATED":
+            continue
+        evaluation = orchestrator.get_report(db, r.id)
+        if evaluation is not None and not evaluation.not_assessed:
+            latest_evaluation = evaluation
+            break
+    if latest_evaluation is not None:
+        # Same tie-break as roundzero.debrief.synthesis.strengths_and_weaknesses:
+        # lowest score first, and among equal scores the higher-weight
+        # (more critical) dimension counts as "weaker" for prioritization.
+        ranked = sorted(latest_evaluation.dimension_scores, key=lambda d: (d.score, -d.weight))
+        weakest = [
+            WeakDimensionOut(dimension=d.dimension, label=d.label, score=d.score) for d in ranked[:_N_WEAKEST]
+        ]
+        weak_dims = {d.dimension for d in weakest}
+        if weak_dims:
+            rows = (
+                db.query(StudyResource)
+                .filter(StudyResource.dimension.in_(weak_dims))
+                .order_by(StudyResource.dimension, StudyResource.sort_order)
+                .all()
+            )
+            suggested = [
+                SuggestedResourceOut(
+                    id=r.id, dimension=r.dimension, kind=r.kind, title=r.title, url=r.url, note=r.note
                 )
-                suggested = [
-                    SuggestedResourceOut(
-                        id=r.id, dimension=r.dimension, kind=r.kind, title=r.title, url=r.url, note=r.note
-                    )
-                    for r in rows
-                ]
+                for r in rows
+            ]
 
     consultancy_setting = db.get(AppSetting, "consultancy_booking_url")
     substack_setting = db.get(AppSetting, "substack_url")

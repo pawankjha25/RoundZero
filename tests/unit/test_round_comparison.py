@@ -21,7 +21,7 @@ from datetime import datetime, timezone  # noqa: E402
 
 from apps.api import orchestrator  # noqa: E402
 from apps.api.db import Base, SessionLocal, engine  # noqa: E402
-from apps.api.models import RoundAttempt  # noqa: E402
+from apps.api.models import RoundAttempt, TranscriptTurn  # noqa: E402
 from apps.api.schemas import StartRoundRequest  # noqa: E402
 
 Base.metadata.create_all(bind=engine)
@@ -39,6 +39,21 @@ _START_REQ = StartRoundRequest(
 def _new_evaluated_round(db, user_id: str) -> str:
     round_, _first_turn = orchestrator.create_round(db, user_id, _START_REQ)
     round_id = round_.id
+    # RZ-02 (UI/UX review, 2026-09-29): submit_round now short-circuits a
+    # round with no candidate turns at all to a "not assessed" result
+    # (dimension_scores=[]), instead of scoring it like a real attempt - so
+    # this fixture needs one real candidate turn to keep testing actual
+    # dimension-score comparison, not the not-assessed path.
+    db.add(
+        TranscriptTurn(
+            round_id=round_id,
+            turn_index=1,
+            speaker="candidate",
+            text="I'd start by clarifying the latency and throughput requirements.",
+            phase="ACTIVE",
+        )
+    )
+    db.commit()
     round_ = db.get(RoundAttempt, round_id)
     orchestrator.submit_round(db, round_)
     return round_id

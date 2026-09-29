@@ -5,6 +5,7 @@
 // phase, timer, End Round. No app nav, no sidebar, no score/competency
 // progress. This is the ONLY chrome rendered during an interview -
 // app/interview/[roundId]/page.tsx no longer wraps the round in <AppShell>.
+import { useState } from "react";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import type { RoundSummary } from "@/lib/api";
@@ -54,6 +55,11 @@ interface InterviewHeaderProps {
 
 export default function InterviewHeader({ round, secondsLeft, ending, onEnd }: InterviewHeaderProps) {
   const timeIsLow = secondsLeft <= 120;
+  // RZ-07 (UI/UX review, 2026-09-29): End Round used to call onEnd()
+  // directly on a single click - one misclick finalized the round with no
+  // way back. Now the first click only asks; the round only actually ends
+  // once "End and evaluate" is clicked a second time.
+  const [confirming, setConfirming] = useState(false);
 
   return (
     <header className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
@@ -77,13 +83,30 @@ export default function InterviewHeader({ round, secondsLeft, ending, onEnd }: I
             (EndInterviewTransition) owns the only end-of-round action from
             here on, including its own Retry Evaluation button on failure, so
             a second stale "Ending..." control here would be confusing. */}
-        {!ending && (
-          <button
-            onClick={onEnd}
-            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:border-border-strong"
-          >
-            End Round
-          </button>
+        {!ending && confirming ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setConfirming(false)}
+              className="rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:border-border-strong"
+            >
+              Continue interview
+            </button>
+            <button
+              onClick={onEnd}
+              className="rounded-md border border-status-strong-concern px-3 py-2 text-sm font-medium text-status-strong-concern hover:bg-status-strong-concern/10"
+            >
+              End and evaluate
+            </button>
+          </div>
+        ) : (
+          !ending && (
+            <button
+              onClick={() => setConfirming(true)}
+              className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:border-border-strong"
+            >
+              End Round
+            </button>
+          )
         )}
       </div>
     </header>
