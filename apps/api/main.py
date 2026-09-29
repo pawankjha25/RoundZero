@@ -35,9 +35,21 @@ with SessionLocal() as _seed_db:
 
 app = FastAPI(title="Round Zero API")
 
+_DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "https://roundzero.architectingintelligencelabs.com",
+]
+_cors_env = os.environ.get("CORS_ORIGINS", "").strip()
+_cors_origins = (
+    [o.strip() for o in _cors_env.split(",") if o.strip()]
+    if _cors_env
+    else _DEFAULT_CORS_ORIGINS
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_cors_origins,
+    allow_origin_regex=r"https://roundzero-.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
